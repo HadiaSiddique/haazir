@@ -14,3 +14,6 @@ Every important AWS command run by the coding agent (Claude Code) during the bui
 | 03:53 | `aws lambda get-function` + inspect zip | Found packaging bug (Globals CodeUri ignored, whole repo zipped). Fixed template, redeployed |
 | 03:55 | `aws lambda invoke haazir-api {action: seed}` | 943 simulated records seeded |
 | 03:56 | curl every route on the live URL | All 200: /, /ask, /stats, /medicine/search, /equipment, /blood/search, /map, /staff/parse |
+| 04:00 | `deploy.ps1 -Cdn` (CloudFormation update) | Creating private S3 bucket + CloudFront OAC + distribution |
+| 04:05 | live `/staff/parse` + `/staff/update` + `/staff/alerts` | Roman-Urdu message gave 3 updates; Mayo now shows 2 free Medicine beds, CT down; ambulance alert received |
+| 04:07 | `aws bedrock-runtime converse` (Nova Lite/Micro/Pro, Claude Haiku 4.5) | Nova: daily token quota exhausted (new account). Claude: Anthropic use-case form not yet submitted |

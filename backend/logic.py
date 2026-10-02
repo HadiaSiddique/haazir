@@ -269,7 +269,9 @@ def rank_hospitals(snap, lat, lon, dept=None, equipment=None, female=False, seha
                 score -= 40
                 why.append(f"{equipment} down")
         load = card["erLoad"]
-        score += {"Low": 10, "Busy": 0, "Full": -15}.get(load, 0)
+        score += {"Low": 10, "Busy": 0, "Full": -35 if red_flag else -15}.get(load, 0)
+        if load == "Full":
+            why.append("ER full")
         score -= card["etaMin"] * (2.5 if red_flag else 1.2)  # in emergencies every minute counts more
         card["score"] = round(score, 1)
         card["why"] = ", ".join(why[:3]) + f" · {card['etaMin']} min away"
