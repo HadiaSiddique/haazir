@@ -194,6 +194,22 @@ def r_ambulance_request(event):
             "destination": {"id": dest["id"], "name": dest["name"]}, "summary": summary, "hospitalAlerted": True}
 
 
+def r_ambulances(event):
+    """Nearby demo ambulances with distance and simulated ETA (35 km/h with sirens in Lahore traffic)."""
+    q = qs(event)
+    lat, lon = logic.loc(q.get("lat"), q.get("lon"))
+    rows = []
+    for a in db.snapshot()["ambulances"].values():
+        km = logic.haversine(lat, lon, a["lat"], a["lon"])
+        rows.append({"id": a["id"], "type": a["type"], "status": a["status"], "lat": a["lat"], "lon": a["lon"],
+                     "distanceKm": round(km, 1), "etaMin": logic.eta_min(km, 35), "updatedAt": a.get("updatedAt")})
+    rows.sort(key=lambda r: (r["status"] != "available", r["distanceKm"]))
+    avail = [r for r in rows if r["status"] == "available"]
+    return {"ambulances": rows, "available": len(avail), "total": len(rows),
+            "nearest": avail[0] if avail else None,
+            "nearestALS": next((r for r in avail if r["type"] == "ALS"), None)}
+
+
 def r_ambulance_status(event, rid):
     req = db.get(f"REQUEST#{rid}")
     if not req:
@@ -469,6 +485,7 @@ ROUTES = [
     ("GET", r"^/hospitals$", r_hospitals),
     ("GET", r"^/facilities$", r_facilities),
     ("GET", r"^/facility/([\w-]+)$", r_facility),
+    ("GET", r"^/ambulances$", r_ambulances),
     ("POST", r"^/ambulance/request$", r_ambulance_request),
     ("GET", r"^/ambulance/request/(R[0-9A-F]{6})$", r_ambulance_status),
     ("POST", r"^/notify$", r_notify),
@@ -517,8 +534,12 @@ def api(event, context=None):
     # direct invocations (deploy script)
     if event.get("action") == "seed":
         items = build_items()
+        keep = {(i["pk"], i["sk"]) for i in items}
+        stale = [(i["pk"], i["sk"]) for i in db._scan_all()
+                 if i["pk"].startswith(("FACILITY#", "AMBULANCE#")) and (i["pk"], i["sk"]) not in keep]
+        db.batch_delete(stale)
         db.batch_write(items)
-        return {"seeded": len(items)}
+        return {"seeded": len(items), "removedStale": len(stale)}
     if event.get("action") == "simulate" or event.get("source") == "aws.events":
         return sim.run()
     method = event.get("requestContext", {}).get("http", {}).get("method", "GET")

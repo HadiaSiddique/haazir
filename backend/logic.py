@@ -242,10 +242,10 @@ def rank_hospitals(snap, lat, lon, dept=None, equipment=None, female=False, seha
                 why.append(f"{fb} free {dept} beds")
             specialists = [d for d in f["doctors"].values() if d.get("onDuty") and d["dept"] == dept]
             if specialists:
-                score += 20
+                score += 25
                 why.append(f"{specialists[0]['name']} on duty")
             else:
-                score -= 15
+                score -= 30
                 why.append(f"no {dept} doctor on duty")
         if female:
             fem = [d for d in f["doctors"].values() if d.get("onDuty") and d["gender"] == "F"
@@ -275,7 +275,9 @@ def rank_hospitals(snap, lat, lon, dept=None, equipment=None, female=False, seha
         score -= card["etaMin"] * (2.5 if red_flag else 1.2)  # in emergencies every minute counts more
         card["score"] = round(score, 1)
         card["why"] = ", ".join(why[:3]) + f" · {card['etaMin']} min away"
-        card["canHelp"] = (fb is None or fb > 0) and not (equipment and f["equipment"].get(equipment, {}).get("status", "down") == "down")
+        has_specialist = not dept or any(d.get("onDuty") and d["dept"] == dept for d in f["doctors"].values())
+        card["canHelp"] = ((fb is None or fb > 0) and has_specialist
+                           and not (equipment and f["equipment"].get(equipment, {}).get("status", "down") == "down"))
         results.append(card)
     results.sort(key=lambda c: -c["score"])
     return results

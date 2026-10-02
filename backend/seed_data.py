@@ -4,23 +4,23 @@ import time
 
 # id, name, nameUr, lat, lon, departments, sehatCard
 HOSPITALS = [
-    ("mayo", "Mayo Hospital", "میو ہسپتال", 31.5767, 74.3127,
+    ("mayo", "Mayo Hospital", "میو ہسپتال", 31.5711, 74.3154,
      ["Emergency", "Medicine", "Surgery", "Cardiology", "Orthopaedics", "ICU", "Burns", "Paediatrics"], True),
-    ("services", "Services Hospital", "سروسز ہسپتال", 31.5408, 74.3370,
+    ("services", "Services Hospital", "سروسز ہسپتال", 31.5413, 74.3331,
      ["Emergency", "Medicine", "Surgery", "Gynae/Obstetrics", "Orthopaedics", "ICU", "Paediatrics"], True),
-    ("jinnah", "Jinnah Hospital", "جناح ہسپتال", 31.4846, 74.2972,
+    ("jinnah", "Jinnah Hospital", "جناح ہسپتال", 31.4845, 74.2970,
      ["Emergency", "Medicine", "Surgery", "Cardiology", "Gynae/Obstetrics", "Orthopaedics", "ICU", "Burns"], True),
-    ("gangaram", "Sir Ganga Ram Hospital", "سر گنگا رام ہسپتال", 31.5560, 74.3240,
+    ("gangaram", "Sir Ganga Ram Hospital", "سر گنگا رام ہسپتال", 31.5544, 74.3207,
      ["Emergency", "Medicine", "Surgery", "Gynae/Obstetrics", "Paediatrics", "ICU"], True),
-    ("lgh", "Lahore General Hospital", "لاہور جنرل ہسپتال", 31.4560, 74.3535,
+    ("lgh", "Lahore General Hospital", "لاہور جنرل ہسپتال", 31.4554, 74.3501,
      ["Emergency", "Medicine", "Surgery", "Orthopaedics", "ICU", "Cardiology"], True),
-    ("childrens", "Children's Hospital Lahore", "چلڈرن ہسپتال", 31.4940, 74.3330,
+    ("childrens", "Children's Hospital Lahore", "چلڈرن ہسپتال", 31.4801, 74.3430,
      ["Emergency", "Paediatrics", "Surgery", "ICU"], True),
-    ("pic", "Punjab Institute of Cardiology", "پنجاب انسٹیٹیوٹ آف کارڈیالوجی", 31.5370, 74.3420,
+    ("pic", "Punjab Institute of Cardiology", "پنجاب انسٹیٹیوٹ آف کارڈیالوجی", 31.5378, 74.3355,
      ["Emergency", "Cardiology", "ICU"], True),
-    ("zayed", "Shaikh Zayed Hospital", "شیخ زاید ہسپتال", 31.5126, 74.3031,
+    ("zayed", "Shaikh Zayed Hospital", "شیخ زاید ہسپتال", 31.5091, 74.3090,
      ["Emergency", "Medicine", "Surgery", "Cardiology", "Gynae/Obstetrics", "ICU", "Paediatrics"], False),
-    ("ladyaitchison", "Lady Aitchison Hospital", "لیڈی ایچیسن ہسپتال", 31.5725, 74.3150,
+    ("ladyaitchison", "Lady Aitchison Hospital", "لیڈی ایچیسن ہسپتال", 31.5738, 74.3155,
      ["Emergency", "Gynae/Obstetrics", "Paediatrics"], True),
     ("ladywillingdon", "Lady Willingdon Hospital", "لیڈی ولنگڈن ہسپتال", 31.5880, 74.3110,
      ["Emergency", "Gynae/Obstetrics", "Paediatrics"], True),
@@ -106,10 +106,10 @@ PHARMACIES = [
 ]
 
 BLOOD_BANKS = [
-    ("bb-mayo", "Hospital Blood Bank – Mayo", 31.5760, 74.3135),
-    ("bb-services", "Hospital Blood Bank – Services", 31.5400, 74.3360),
-    ("bb-jinnah", "Hospital Blood Bank – Jinnah", 31.4850, 74.2985),
-    ("bb-gangaram", "Hospital Blood Bank – Ganga Ram", 31.5552, 74.3250),
+    ("bb-mayo", "Hospital Blood Bank – Mayo", 31.5716, 74.3150),
+    ("bb-services", "Hospital Blood Bank – Services", 31.5408, 74.3326),
+    ("bb-jinnah", "Hospital Blood Bank – Jinnah", 31.4849, 74.2976),
+    ("bb-gangaram", "Hospital Blood Bank – Ganga Ram", 31.5540, 74.3212),
     ("bb-johar", "Community Blood Bank Johar Town", 31.4680, 74.2760),
     ("bb-gulberg", "Community Blood Bank Gulberg", 31.5180, 74.3450),
 ]

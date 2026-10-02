@@ -33,7 +33,9 @@ nav.links a { text-decoration: none; color: var(--muted); padding: 8px 10px; bor
 nav.links a:hover, nav.links a.on { background: var(--brand-l); color: var(--brand); }
 .lang { border: 1px solid var(--line); background: var(--card); border-radius: 8px; padding: 6px 10px; cursor: pointer; font-weight: 600; }
 .call1122 { background: var(--bad); color: #fff !important; padding: 8px 12px !important; border-radius: 10px; font-weight: 700 !important; }
-@media (max-width: 720px) { nav.links .hide-m { display: none; } }
+nav.links { overflow-x: auto; scrollbar-width: none; }
+nav.links a, .lang { white-space: nowrap; flex-shrink: 0; }
+@media (max-width: 900px) { nav.links .hide-m { display: none; } }
 
 main { padding: 20px 0 80px; min-height: 70vh; }
 h1 { font-size: 30px; line-height: 1.2; letter-spacing: -.02em; margin: 8px 0 8px; }
@@ -56,6 +58,8 @@ h3 { font-size: 16px; margin: 0 0 6px; }
 .locrow { margin-top: 12px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; font-size: 14px; }
 .locrow button, .locrow select { background: rgba(255,255,255,.14); color: #fff; border: 1px solid rgba(255,255,255,.35); border-radius: 8px; padding: 6px 10px; cursor: pointer; }
 .locrow select option { color: #14212b; }
+.locrow.light { color: var(--muted); }
+.locrow.light button, .locrow.light select { background: var(--card); color: var(--ink); border: 1px solid var(--line); min-height: 36px; }
 
 .tiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-top: 16px; }
 @media (max-width: 720px) { .tiles { grid-template-columns: repeat(2, 1fr); } }

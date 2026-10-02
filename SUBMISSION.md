@@ -33,7 +33,7 @@ So we lost the one thing you can't get back in an emergency: **time.** We drove 
 |---|---|---|
 | 🚨 | **Emergency first** | Danger signs (chest pain, breathing difficulty, unconscious, heavy bleeding, stroke signs, seizure, severe injury, labour complications) show a red **"Call Rescue 1122 now"** banner before anything else. Haazir routes you to a department. It never diagnoses. |
 | 🛏️ | **Hospital beds & doctors** | Ranked by free beds in the right department, specialist on duty now (and until when), working machines, ER load and travel time, with a one-line **"why this hospital"**. Filters: Sehat Card, female doctor. |
-| 🚑 | **Ambulance (demo network)** | Picks the nearest free vehicle (advanced life support for danger signs), chooses the best destination hospital, **alerts that hospital before arrival** with a one-line summary, and shows the ambulance moving on a live map. A real `tel:1122` button is always next to it. |
+| 🚑 | **Ambulance (demo network)** | Shows **ambulances near you** on a live map with distance and ETA. Picks the nearest free vehicle (advanced life support for danger signs), chooses the best destination hospital, **alerts that hospital before arrival** with a one-line summary, and shows the ambulance moving on a live map. A real `tel:1122` button is always next to it. |
 | 💊 | **Medicine** | Stock, quantity and price at nearby pharmacies, **cheaper same-salt alternatives**, and free hospital dispensary stock. **Scan a prescription photo**: AI reads the names, you confirm them, and Haazir finds **one pharmacy that has everything** (or the fewest stops) with a total cost. |
 | 🩸 | **Blood** | Units of your group at blood banks, plus ABO/Rh-compatible groups (clearly labelled), and a ready-to-forward **WhatsApp request** in English and Urdu. |
 | 🩻 | **Machines** | Where CT, MRI, X-ray, dialysis, ventilators and oxygen are **working right now**, with queue estimates. |
@@ -76,7 +76,7 @@ flowchart LR
 5. **Safe medicine switching.** Alternatives are only the same active ingredient and strength, always with "Confirm with your doctor or pharmacist before switching."
 
 ## Honest limitations
-- **All availability data in this pilot is simulated**, covering 10 major Lahore public hospitals (approximate real locations), 18 fictional pharmacies, 6 blood banks and 12 demo ambulances. Haazir is not connected to any real hospital, pharmacy, blood bank or Rescue 1122.
+- **What's real and what's simulated:** the 10 hospitals are real Lahore public hospitals at locations checked against OpenStreetMap and Wikipedia, with departments that match each hospital's role (for example, PIC is cardiac only and Lady Willingdon is maternity). Medicine brands are mapped to their real active ingredients, and blood compatibility follows the standard ABO/Rh table. **Everything else is simulated:** bed counts, doctor names (fictional), duty rosters, machine status, the 18 pharmacies and their stock and prices, blood bank units, and the 12 demo ambulances. Haazir is not connected to any real hospital, pharmacy, blood bank or Rescue 1122, and phone numbers are intentionally not shown.
 - A real rollout needs partners: hospitals, pharmacies and blood banks willing to update, plus verified staff accounts (the demo PIN would become Amazon Cognito sign-in).
 - My AWS account was brand new and still being verified during the hackathon, so Bedrock calls returned "account being verified" for part of the build. The keyword fallback kept every feature working. [Update this line if Bedrock started working before you submitted.]
 

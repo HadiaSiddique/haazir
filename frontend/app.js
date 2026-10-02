@@ -60,6 +60,8 @@
     const m = window.L.map(el, { scrollWheelZoom: false }).setView(center, zoom || 12);
     window.L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 18, attribution: "© OpenStreetMap" }).addTo(m);
     maps.push(m);
+    // the container may not have its final size yet; re-measure after layout
+    setTimeout(() => { try { m.invalidateSize(); } catch (e) {} }, 150);
     return m;
   }
   const dotIcon = (emoji) => window.L.divIcon({ className: "", html: `<div style="font-size:24px;line-height:24px">${emoji}</div>`, iconSize: [24, 24], iconAnchor: [12, 12] });
@@ -72,7 +74,7 @@
   function chrome() {
     document.documentElement.lang = state.lang === "ur" ? "ur" : "en";
     document.documentElement.dir = state.lang === "ur" ? "rtl" : "ltr";
-    document.getElementById("pilot").textContent = L_("⚠️ Pilot demo: availability data is simulated, not live.", "⚠️ پائلٹ ڈیمو: دستیابی کا ڈیٹا فرضی ہے، اصل نہیں۔");
+    document.getElementById("pilot").textContent = L_("⚠️ Pilot demo: hospital names and locations are real; beds, doctors, stock, blood and ambulances are simulated.", "⚠️ پائلٹ ڈیمو: ہسپتالوں کے نام اور مقام اصل ہیں؛ بستر، ڈاکٹر، اسٹاک، خون اور ایمبولینس فرضی ہیں۔");
     const r = location.hash.split("?")[0];
     const link = (h, en, ur, cls) => `<a href="${h}" class="${cls || ""} ${r === h ? "on" : ""}">${L_(en, ur)}</a>`;
     document.getElementById("nav").innerHTML =
@@ -87,9 +89,9 @@
   // ------------------------------------------------------------ shared blocks
   function locationRow(light) {
     const opts = Object.keys(AREAS).map((a) => `<option ${state.loc.label === a ? "selected" : ""}>${a}</option>`).join("");
-    return `<div class="locrow" ${light ? 'style="color:var(--muted)"' : ""}>📍 <span id="locLabel">${esc(state.loc.label || L_("My location", "میری لوکیشن"))}</span>
-      <button type="button" id="gpsBtn" ${light ? 'class="btn sm"' : ""}>${L_("Use my location", "میری لوکیشن")}</button>
-      <select id="areaSel" ${light ? 'class="btn sm"' : ""}><option value="">${L_("or pick area", "یا علاقہ چنیں")}</option>${opts}</select></div>`;
+    return `<div class="locrow ${light ? "light" : ""}">📍 <span id="locLabel">${esc(state.loc.label || L_("My location", "میری لوکیشن"))}</span>
+      <button type="button" id="gpsBtn">${L_("Use my location", "میری لوکیشن")}</button>
+      <select id="areaSel"><option value="">${L_("or pick area", "یا علاقہ چنیں")}</option>${opts}</select></div>`;
   }
   function bindLocation(onChange) {
     const gps = document.getElementById("gpsBtn"), sel = document.getElementById("areaSel");
@@ -115,6 +117,7 @@
         <a class="btn w" href="tel:1122">📞 ${L_("Call Rescue 1122", "ریسکیو 1122 کال کریں")}</a>
         <button class="btn" style="background:transparent;color:#fff" data-amb="${esc(condition || "")}">🚑 ${L_("Request ambulance (demo)", "ایمبولینس منگوائیں (ڈیمو)")}</button>
       </div>
+      <div class="small nearestAmb" style="margin-top:8px"></div>
       <div class="small" style="margin-top:8px;opacity:.9">${L_("Haazir is not a diagnosis. The demo ambulance network is simulated, so always call 1122 first.", "یہ تشخیص نہیں۔ ڈیمو ایمبولینس فرضی ہے، پہلے 1122 کال کریں۔")}</div>
     </div>`;
   }
@@ -145,7 +148,6 @@
       </div>
       <div class="btns">
         <a class="btn p" target="_blank" rel="noopener" href="${dirUrl(h.lat, h.lon)}">🧭 ${L_("Directions", "راستہ")}</a>
-        <a class="btn" href="tel:${esc(h.phone || "")}">📞 ${L_("Call", "کال")}</a>
         <button class="btn" data-notify="${h.id}" data-dept="${esc(d || "Emergency")}" data-name="${esc(h.name)}" data-eta="${h.etaMin}">🔔 ${L_("Notify hospital", "ہسپتال کو اطلاع دیں")}</button>
         ${opts.redFlag ? `<button class="btn d" data-amb="${esc(opts.condition || "")}" data-dest="${h.id}">🚑 ${L_("Ambulance to here (demo)", "یہاں ایمبولینس (ڈیمو)")}</button>` : ""}
         <a class="btn" href="#/facility/${h.id}">${L_("Details", "تفصیل")} →</a>
@@ -156,6 +158,7 @@
   function bindActions(root) {
     root.querySelectorAll("[data-amb]").forEach((b) => b.onclick = () => requestAmbulance(b.dataset.amb, b.dataset.dest, b));
     root.querySelectorAll("[data-notify]").forEach((b) => b.onclick = () => notifyModal(b.dataset));
+    root.querySelectorAll(".nearestAmb").forEach(fillNearestAmbulance);
     root.querySelectorAll("[data-ask]").forEach((b) => b.onclick = () => { location.hash = "#/ask?q=" + encodeURIComponent(b.dataset.ask); });
   }
 
@@ -287,8 +290,9 @@
       if (d.minutesSaved) html += `<div class="note">⏱️ ${L_("The nearest hospital can't help right now, so we sent you to the best option instead. That saves a wasted trip (about 25 minutes).", "قریبی ہسپتال ابھی مدد نہیں کر سکتا، اس لیے بہتر آپشن دکھایا۔")}</div>`;
       if (d.intent === "ambulance") {
         html += `<div class="card"><h3>🚑 ${L_("Ambulance", "ایمبولینس")}</h3><p class="small muted">${L_("For any emergency call Rescue 1122. You can also request the nearest vehicle from the demo ambulance network.", "کسی بھی ایمرجنسی میں 1122 کال کریں۔")}</p>
-          <div class="btns"><a class="btn d" href="tel:1122">📞 ${L_("Call Rescue 1122", "ریسکیو 1122")}</a><button class="btn p" data-amb="${esc(q)}">🚑 ${L_("Request ambulance (demo)", "ایمبولینس منگوائیں (ڈیمو)")}</button></div></div>`;
+          <div class="btns"><a class="btn d" href="tel:1122">📞 ${L_("Call Rescue 1122", "ریسکیو 1122")}</a><button class="btn p" data-amb="${esc(q)}">🚑 ${L_("Request ambulance (demo)", "ایمبولینس منگوائیں (ڈیمو)")}</button><a class="btn" href="#/ambulance">🗺️ ${L_("See ambulances near me", "قریبی ایمبولینس دیکھیں")}</a></div><div class="small nearestAmb" style="margin-top:8px"></div></div>`;
       }
+      if (d.hospitals && d.hospitals.length) html += `<div class="chips"><a class="chip" href="#/hospitals?dept=${encodeURIComponent(e.department || "Emergency")}&sehat=1">Sehat Card</a><a class="chip" href="#/hospitals?dept=${encodeURIComponent(e.department || "Emergency")}&female=1">♀ ${L_("Female doctor", "لیڈی ڈاکٹر")}</a></div>`;
       if (d.hospitals) html += d.hospitals.length ? d.hospitals.map((h, i) => hospitalCard(h, i, { redFlag: e.redFlag, condition: q })).join("") : `<div class="empty">${L_("No matching hospital found.", "کوئی ہسپتال نہیں ملا۔")}</div>`;
       res.innerHTML = html + (d.medicine ? '<div id="medRes"></div>' : "") + (d.blood ? '<div id="bloodRes"></div>' : "") + (d.equipment ? '<div id="eqRes"></div>' : "");
       if (d.medicine) renderMedicine(document.getElementById("medRes"), d.medicine);
@@ -330,7 +334,7 @@
           Object.entries(f.beds).map(([k, b]) => `<tr class="${b.stale ? "stale" : ""}"><td>${esc(dept(k))}</td><td><span class="pill ${bedClass(b.free, b.total)}">${b.free}</span></td><td>${b.total}</td><td class="small muted">${ago(b.updatedAt)}${staleNote(b.updatedAt)}</td></tr>`).join("") + "</table></div>";
       }
       if (f.doctors && f.doctors.length) {
-        html += `<h2>${L_("Doctors", "ڈاکٹر")}</h2><div class="card"><table class="t">` + f.doctors.map((d) => `<tr><td>${esc(d.name)} ${d.gender === "F" ? "♀" : ""}</td><td>${esc(dept(d.dept))}</td><td>${d.onDuty ? `<span class="pill g">${L_("on duty", "ڈیوٹی پر")}${d.shiftEnds ? " → " + d.shiftEnds : ""}</span>` : `<span class="pill x">${L_("off", "چھٹی")}</span>`}</td></tr>`).join("") + "</table></div>";
+        html += `<h2>${L_("Doctors", "ڈاکٹر")} <span class="pill x">${L_("fictional names · pilot", "فرضی نام · پائلٹ")}</span></h2><div class="card"><table class="t">` + f.doctors.map((d) => `<tr><td>${esc(d.name)} ${d.gender === "F" ? "♀" : ""}</td><td>${esc(dept(d.dept))}</td><td>${d.onDuty ? `<span class="pill g">${L_("on duty", "ڈیوٹی پر")}${d.shiftEnds ? " → " + d.shiftEnds : ""}</span>` : `<span class="pill x">${L_("off", "چھٹی")}</span>`}</td></tr>`).join("") + "</table></div>";
       }
       if (f.equipment && Object.keys(f.equipment).length) {
         html += `<h2>${L_("Machines", "مشینیں")}</h2><div class="card pills">` + Object.entries(f.equipment).map(([k, e]) => eqPill(k, e) + (e.queue ? `<span class="small muted">(${L_("queue", "قطار")} ${e.queue})</span>` : "")).join(" ") + "</div>";
@@ -348,17 +352,60 @@
   }
 
   // ---- ambulance
-  function ambulancePage() {
+  const ambType = (t) => (t === "ALS" ? L_("Advanced life support", "ایڈوانس لائف سپورٹ") : L_("Basic", "بیسک"));
+  const ambStatus = (s) => (s === "available" ? `<span class="pill g">${L_("free", "فارغ")}</span>` : `<span class="pill a">${L_("on a call", "مصروف")}</span>`);
+
+  // one-line "nearest ambulance" summary, filled in async (used in the emergency banner)
+  async function fillNearestAmbulance(el) {
+    if (!el) return;
+    try {
+      const d = await api(`/ambulances?${locQ()}`);
+      const n = d.nearestALS && d.nearestALS.etaMin <= (d.nearest ? d.nearest.etaMin + 5 : 99) ? d.nearestALS : d.nearest;
+      el.innerHTML = n ? `🚑 ${L_("Nearest demo ambulance", "قریب ترین ڈیمو ایمبولینس")}: <b>${esc(n.id)}</b> (${ambType(n.type)}) · ${n.distanceKm} km · ~${n.etaMin} min · ${d.available}/${d.total} ${L_("free", "فارغ")}` : L_("No demo ambulance free right now. Call 1122.", "کوئی ڈیمو ایمبولینس فارغ نہیں، 1122 کال کریں۔");
+    } catch (e) { el.textContent = ""; }
+  }
+
+  async function ambulancePage() {
     $app.innerHTML = `<h1>🚑 ${L_("Ambulance", "ایمبولینس")}</h1>
       <div class="alert-red"><h2>📞 ${L_("Real emergency? Call Rescue 1122.", "اصل ایمرجنسی؟ 1122 کال کریں۔")}</h2><div class="btns"><a class="btn w" href="tel:1122">${L_("Call Rescue 1122", "ریسکیو 1122 کال کریں")}</a></div></div>
       <div class="card"><h3>${L_("Demo ambulance network", "ڈیمو ایمبولینس نیٹ ورک")} <span class="pill x">${L_("simulated", "فرضی")}</span></h3>
       <p class="small muted">${L_("Picks the nearest free vehicle (advanced life support for danger signs), chooses the best hospital and alerts it before you arrive.", "قریبی ایمبولینس، بہترین ہسپتال، اور پیشگی اطلاع۔")}</p>
       <textarea id="cond" maxlength="300" placeholder="${L_("What happened? e.g. abbu behosh ho gaye, saans nahi aa rahi", "کیا ہوا؟")}"></textarea>
       ${locationRow(true)}
-      <div class="btns"><button class="btn p" id="reqBtn">🚑 ${L_("Request ambulance (demo)", "ایمبولینس منگوائیں (ڈیمو)")}</button></div></div>`;
-    bindLocation();
+      <div class="btns"><button class="btn p" id="reqBtn">🚑 ${L_("Request ambulance (demo)", "ایمبولینس منگوائیں (ڈیمو)")}</button></div></div>
+      <h2>${L_("Ambulances near you", "آپ کے قریب ایمبولینس")} <span class="pill x">${L_("live · simulated", "لائیو · فرضی")}</span></h2>
+      <div class="legend"><span>📍 ${L_("you", "آپ")}</span><span>🚑 ${L_("free", "فارغ")}</span><span>🚨 ${L_("on a call", "مصروف")}</span></div>
+      <div class="map" id="ambNear"></div><div id="ambList">${skeleton(2)}</div>`;
+    bindLocation(() => ambulancePage());
     const b = document.getElementById("reqBtn");
     b.onclick = () => requestAmbulance(document.getElementById("cond").value.trim() || "Emergency", null, b);
+    const m = makeMap(document.getElementById("ambNear"), [state.loc.lat, state.loc.lon], 13);
+    const layer = m ? window.L.layerGroup().addTo(m) : null;
+    youMarker(m);
+    let fitted = false;
+    async function load() {
+      try {
+        const d = await api(`/ambulances?${locQ()}`);
+        const list = document.getElementById("ambList");
+        if (!list) return;
+        if (layer) {
+          layer.clearLayers();
+          d.ambulances.forEach((a) => window.L.marker([a.lat, a.lon], { icon: dotIcon(a.status === "available" ? "🚑" : "🚨") }).addTo(layer)
+            .bindPopup(`<b>${esc(a.id)}</b> · ${ambType(a.type)}<br>${a.distanceKm} km · ~${a.etaMin} min`));
+          if (!fitted) {
+            m.invalidateSize();
+            const near = d.ambulances.filter((a) => a.status === "available").slice(0, 4);
+            m.fitBounds([[state.loc.lat, state.loc.lon], ...near.map((a) => [a.lat, a.lon])], { padding: [30, 30], maxZoom: 14 });
+            fitted = true;
+          }
+        }
+        list.innerHTML = `<div class="small muted" style="margin:6px 0">${d.available} ${L_("of", "میں سے")} ${d.total} ${L_("demo ambulances free right now. Positions refresh every 10 seconds.", "ڈیمو ایمبولینس اس وقت فارغ ہیں۔")}</div>` +
+          d.ambulances.slice(0, 6).map((a, i) => `<div class="card ${i === 0 && a.status === "available" ? "top1" : ""}"><div class="row"><div class="big ${a.status === "available" ? "g" : "a"}" style="font-size:26px">${a.etaMin}<small>${L_("min away", "منٹ دور")}</small></div>
+            <div class="grow"><h3>🚑 ${esc(a.id)} · ${ambType(a.type)}</h3><div class="small muted">${a.distanceKm} km · ${L_("updated", "اپ ڈیٹ")} ${ago(a.updatedAt)}</div><div class="pills">${ambStatus(a.status)}</div></div></div></div>`).join("");
+      } catch (e) { const list = document.getElementById("ambList"); if (list) list.innerHTML = errBox(e); }
+    }
+    await load();
+    every(load, 10000);
   }
 
   async function ambulanceTrack(rid) {
@@ -550,7 +597,7 @@
       try {
         const d = await api("/facilities");
         const groups = { hospital: L_("Hospitals", "ہسپتال"), pharmacy: L_("Pharmacies", "فارمیسیاں"), bloodbank: L_("Blood banks", "بلڈ بینک") };
-        document.getElementById("sFac").innerHTML = Object.entries(groups).map(([t, lbl]) => `<optgroup label="${lbl}">${d.facilities.filter((f) => f.type === t).map((f) => `<option value="${f.id}">${esc(f.name)}</option>`).join("")}</optgroup>`).join("");
+        document.getElementById("sFac").innerHTML = Object.entries(groups).map(([t, lbl]) => `<optgroup label="${lbl}">${d.facilities.filter((f) => f.type === t).map((f) => `<option value="${f.id}" ${f.id === "hosp-mayo" ? "selected" : ""}>${esc(f.name)}</option>`).join("")}</optgroup>`).join("");
       } catch (e) { document.getElementById("sOut").innerHTML = errBox(e); }
       document.getElementById("sGo").onclick = async () => {
         const facilityId = document.getElementById("sFac").value, pin = document.getElementById("sPin").value;
@@ -591,8 +638,21 @@
         body.querySelectorAll("[data-bl]").forEach((b) => b.onclick = () => send([{ kind: "blood", key: b.dataset.bl, delta: +b.dataset.d }]));
       }
     }
-    function renderQuick() {
-      const ex = s.type === "hospital" ? "Medicine ward 3 mein 2 bed khali, CT kharab hai, Dr Sana 8 baje tak duty pe" : s.type === "pharmacy" ? "Panadol khatam, Augmentin 20 packs aa gaye" : "O- 2 unit aa gaye, B+ 10 unit";
+    async function renderQuick() {
+      // build the example from this facility's own wards, machines, doctors and stock so it always parses
+      let ex = s.type === "pharmacy" ? "Panadol khatam, Augmentin 20 packs aa gaye" : s.type === "bloodbank" ? "O- 2 unit aa gaye, B+ 10 unit" : "Medicine ward 3 mein 2 bed khali, CT kharab hai, Dr Sana 8 baje tak duty pe";
+      try {
+        const f = await api(`/facility/${s.facilityId}`);
+        if (s.type === "hospital") {
+          const dept = Object.keys(f.beds).find((d) => d !== "Emergency") || "Emergency";
+          const eq = Object.keys(f.equipment).find((e) => e !== "Oxygen");
+          const doc = f.doctors.find((d) => !d.onDuty) || f.doctors[0];
+          const first = doc ? doc.name.replace(/^Dr\s+/, "").split(" ")[0] : null;
+          ex = `${dept.split("/")[0]} ward mein 2 bed khali` + (eq ? `, ${eq} kharab hai` : "") + (first ? `, Dr ${first} 8 baje tak duty pe` : "");
+        } else if (s.type === "pharmacy" && f.medicine.length > 1) {
+          ex = `${f.medicine[0].name.split(" ")[0]} khatam, ${f.medicine[1].name.split(" ")[0]} 20 packs aa gaye`;
+        }
+      } catch (e) {}
       body.innerHTML = `<div class="card"><h3>⚡ ${L_("Type one message, the way you'd send it on WhatsApp", "ایک پیغام لکھیں، جیسے واٹس ایپ پر")}</h3>
         <textarea id="qText" maxlength="500" placeholder="${esc(ex)}"></textarea><div class="btns"><button class="btn sm" id="qEx">${L_("Use example", "مثال")}</button><button class="btn p" id="qParse">${L_("Preview changes", "تبدیلیاں دیکھیں")}</button></div><div id="qOut"></div></div>`;
       document.getElementById("qEx").onclick = () => { document.getElementById("qText").value = ex; };

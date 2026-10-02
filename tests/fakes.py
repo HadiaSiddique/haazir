@@ -46,6 +46,7 @@ class FakeTable:
             def __enter__(s): return s
             def __exit__(s, *a): pass
             def put_item(s, Item): t.put_item(Item)
+            def delete_item(s, Key): STORE.pop((Key["pk"], Key["sk"]), None)
         return BW()
 
 

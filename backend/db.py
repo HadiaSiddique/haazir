@@ -118,6 +118,13 @@ def query_pk(pk, limit=50):
     return [plain(i) for i in resp.get("Items", [])]
 
 
+def batch_delete(keys):
+    with TABLE.batch_writer() as bw:
+        for pk, sk in keys:
+            bw.delete_item(Key={"pk": pk, "sk": sk})
+    invalidate()
+
+
 def batch_write(items):
     with TABLE.batch_writer(overwrite_by_pkeys=["pk", "sk"]) as bw:
         for it in items:

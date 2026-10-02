@@ -18,3 +18,6 @@ Every important AWS command run by the coding agent (Claude Code) during the bui
 | 04:05 | live `/staff/parse` + `/staff/update` + `/staff/alerts` | Roman-Urdu message gave 3 updates; Mayo now shows 2 free Medicine beds, CT down; ambulance alert received |
 | 04:07 | `aws bedrock-runtime converse` (Nova Lite/Micro/Pro, Claude Haiku 4.5) | Nova: daily token quota exhausted (new account). Claude: Anthropic use-case form not yet submitted |
 | 04:15 | CloudFormation update complete | CloudFront live: https://d1zq9eagbu3k0c.cloudfront.net (S3 private + OAC), site tested end-to-end |
+| 04:45 | OSM Nominatim/Overpass + Wikipedia lookups | Verified real coordinates of 10 hospitals; corrected 8 (Children's was 1.8 km off) |
+| 04:55 | `deploy.ps1 -Seed` | Reseeded corrected data; added /ambulances (nearby map); removed placeholder Call buttons |
+| 05:10 | `deploy.ps1` + live check of 22 routes/intents | All pass on CloudFront + API; staff example now built per facility |
