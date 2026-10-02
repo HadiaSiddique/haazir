@@ -26,6 +26,23 @@ HOSPITALS = [
      ["Emergency", "Gynae/Obstetrics", "Paediatrics"], True),
 ]
 
+# Real private hospitals in Lahore with general emergency departments. Coordinates from OpenStreetMap.
+# Department lists are approximate; all availability is simulated. Fees apply (not free like government).
+_GEN = ["Emergency", "Medicine", "Surgery", "Cardiology", "Gynae/Obstetrics", "Paediatrics", "Orthopaedics", "ICU"]
+PRIVATE_HOSPITALS = [
+    ("doctors", "Doctors Hospital", "ڈاکٹرز ہسپتال", 31.4795, 74.2801, _GEN),
+    ("hameedlatif", "Hameed Latif Hospital", "حمید لطیف ہسپتال", 31.5119, 74.3276,
+     ["Emergency", "Medicine", "Surgery", "Gynae/Obstetrics", "Paediatrics", "ICU"]),
+    ("ittefaq", "Ittefaq Hospital", "اتفاق ہسپتال", 31.4757, 74.3375, _GEN),
+    ("fatimamemorial", "Fatima Memorial Hospital", "فاطمہ میموریل ہسپتال", 31.5356, 74.3280,
+     ["Emergency", "Medicine", "Surgery", "Gynae/Obstetrics", "Paediatrics", "Orthopaedics", "ICU"]),
+    ("surgimed", "Surgimed Hospital", "سرجیمیڈ ہسپتال", 31.5381, 74.3513, ["Emergency", "Medicine", "Surgery", "Orthopaedics", "ICU"]),
+    ("omar", "Omar Hospital", "عمر ہسپتال", 31.5371, 74.3381, ["Emergency", "Medicine", "Cardiology", "Surgery", "ICU"]),
+    ("evercare", "Evercare Hospital", "ایورکیئر ہسپتال", 31.4370, 74.2809, _GEN),
+    ("farooq", "Farooq Hospital", "فاروق ہسپتال", 31.4654, 74.2358, ["Emergency", "Medicine", "Surgery", "Gynae/Obstetrics", "Paediatrics", "ICU"]),
+    ("bahriaintl", "Bahria International Hospital", "بحریہ انٹرنیشنل ہسپتال", 31.3877, 74.1878, _GEN),
+]
+
 DEPT_SIZE = {"Emergency": 40, "Medicine": 60, "Surgery": 50, "Cardiology": 40, "Paediatrics": 40,
              "Gynae/Obstetrics": 45, "Orthopaedics": 35, "ICU": 16, "Burns": 14}
 
@@ -143,13 +160,15 @@ def build_items(now=None):
     used_female = [n for n in used_female if n != "Dr Sana Khan"]
     fi = mi = 0
 
-    for hid, name, name_ur, lat, lon, depts, sehat in HOSPITALS:
+    all_hospitals = [h + ("government",) for h in HOSPITALS] + [h + (False, "private") for h in PRIVATE_HOSPITALS]
+    for hid, name, name_ur, lat, lon, depts, sehat, ownership in all_hospitals:
         fid = f"hosp-{hid}"
+        private = ownership == "private"
         has_female = False
         for d in depts:
-            total = DEPT_SIZE[d]
-            # government hospitals run hot; a few departments full
-            occ_ratio = rnd.choice([0.7, 0.8, 0.9, 0.95, 1.0, 1.0, 0.85, 0.6])
+            total = max(4, int(DEPT_SIZE[d] * 0.35)) if private else DEPT_SIZE[d]
+            # government hospitals run hot (a few departments full); private ones have more room but charge fees
+            occ_ratio = rnd.choice([0.5, 0.6, 0.7, 0.8, 0.9, 1.0] if private else [0.7, 0.8, 0.9, 0.95, 1.0, 1.0, 0.85, 0.6])
             occupied = min(total, int(total * occ_ratio))
             items.append({"pk": f"FACILITY#{fid}", "sk": f"RES#bed#{d}", "kind": "bed", "key": d,
                           "total": total, "occupied": occupied, "updatedAt": ts(), "updatedBy": "ward staff"})
@@ -171,7 +190,7 @@ def build_items(now=None):
                               "updatedAt": ts(), "updatedBy": "duty roster"})
         eq_list = EQUIPMENT if len(depts) > 4 else ["XRay", "Oxygen", "Ventilator"] + (["CT"] if hid == "pic" else [])
         for e in eq_list:
-            status = rnd.choices(["working", "down", "busy"], [0.65, 0.2, 0.15])[0]
+            status = rnd.choices(["working", "down", "busy"], [0.85, 0.07, 0.08] if private else [0.65, 0.2, 0.15])[0]
             if e == "Oxygen":
                 status = "working"
             items.append({"pk": f"FACILITY#{fid}", "sk": f"RES#equipment#{e}", "kind": "equipment", "key": e,
@@ -189,7 +208,8 @@ def build_items(now=None):
                                       "updatedBy": "hospital dispensary"})
         items.append({"pk": f"FACILITY#{fid}", "sk": "META", "type": "hospital", "id": fid, "name": name,
                       "nameUr": name_ur, "lat": lat, "lon": lon, "phone": "042-0000000",
-                      "sehatCard": sehat, "femaleDoctor": has_female or hid.startswith("lady"), "open24h": True})
+                      "sehatCard": sehat, "femaleDoctor": has_female or hid.startswith("lady"), "open24h": True,
+                      "ownership": ownership})
 
     for pid, name, lat, lon in PHARMACIES:
         fid = pid

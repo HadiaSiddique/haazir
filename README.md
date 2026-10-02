@@ -14,7 +14,7 @@ Built for the AWS Builder Center **Zero to Shipped** hackathon. Category: **Soci
 |---|---|
 | 🔎 One search box | Urdu, Roman Urdu or English (typed or spoken). AI picks the need: bed, ambulance, medicine, blood, test, doctor |
 | 🚨 Emergency triage | Danger signs (chest pain, breathing, unconscious, bleeding, stroke, seizure, injury, labour, burns) show a **Call Rescue 1122** banner first. It routes to a department and never diagnoses |
-| 🛏️ Hospitals | Ranked by free beds in the needed department, specialist on duty, working machines, ER load and travel time, each with a one-line *why* |
+| 🛏️ Hospitals | 10 government + 9 private hospitals (real names and locations), filterable. Ranked by free beds in the needed department, specialist on duty, working machines, ER load and travel time, each with a one-line *why* |
 | 🚑 Ambulance (demo) | Nearest free vehicle (ALS for danger signs), best destination hospital, **pre-arrival alert** to that hospital, live moving marker |
 | 💊 Medicine | Stock at nearby pharmacies, cheaper **same-salt** alternatives, free hospital dispensaries, **prescription photo scan** that finds one pharmacy with everything |
 | 🩸 Blood | Units per group at blood banks plus ABO/Rh-compatible groups, and a ready-to-forward **WhatsApp request** (English + Urdu) |
@@ -45,7 +45,7 @@ flowchart LR
 
 | pk | sk | Item |
 |---|---|---|
-| `FACILITY#<id>` | `META` | type (hospital/pharmacy/bloodbank), name, lat/lon, sehatCard, femaleDoctor, open24h |
+| `FACILITY#<id>` | `META` | type (hospital/pharmacy/bloodbank), ownership (government/private), name, lat/lon, sehatCard, femaleDoctor, open24h |
 | `FACILITY#<id>` | `RES#bed#<dept>` | total, occupied |
 | `FACILITY#<id>` | `RES#doctor#<key>` | name, dept, gender, onDuty, shiftEnds |
 | `FACILITY#<id>` | `RES#equipment#<CT…>` | status working/busy/down, queue |

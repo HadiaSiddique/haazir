@@ -115,8 +115,9 @@ def r_hospitals(event):
     lat, lon = logic.loc(q.get("lat"), q.get("lon"))
     dept = q.get("dept") if q.get("dept") in logic.DEPARTMENTS else None
     eq = q.get("equipment") if q.get("equipment") in logic.EQUIP_TYPES else None
+    own = q.get("type") if q.get("type") in ("government", "private") else None
     return {"hospitals": logic.rank_hospitals(db.snapshot(), lat, lon, dept=dept, equipment=eq,
-                                              female=q.get("female") == "1", sehat=q.get("sehat") == "1")}
+                                              female=q.get("female") == "1", sehat=q.get("sehat") == "1", ownership=own)}
 
 
 def r_facility(event, fid):
@@ -134,6 +135,7 @@ def r_facility(event, fid):
     card["medicine"] = sorted(f["medicine"].values(), key=lambda m: m["name"])
     card["blood"] = f["blood"]
     card["open24h"] = f.get("open24h")
+    card["ownership"] = f.get("ownership")
     updates = []
     for g in ("beds", "doctors", "equipment", "medicine", "blood"):
         for r in f[g].values():
@@ -460,6 +462,7 @@ def r_stats(event):
         "bloodUnits": blood, "bloodShortages": [g for g, u in blood.items() if u < 5],
         "counters": snap.get("stats", {}),
         "facilities": len(snap["facilities"]), "updatedAt": logic.now(),
+        "hospitals": len(hosp), "privateHospitals": sum(1 for f in hosp if f.get("ownership") == "private"),
     }
 
 
@@ -474,6 +477,7 @@ def r_map(event):
             p["capacity"] = round(occ / max(1, tot), 2)
             p["freeBeds"] = tot - occ
             p["erLoad"] = logic.er_load(f)
+            p["ownership"] = f.get("ownership", "government")
         pts.append(p)
     ambs = [{"id": a["id"], "type": a["type"], "status": a["status"], "lat": a["lat"], "lon": a["lon"]}
             for a in snap["ambulances"].values()]

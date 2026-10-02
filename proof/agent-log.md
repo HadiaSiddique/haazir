@@ -21,3 +21,5 @@ Every important AWS command run by the coding agent (Claude Code) during the bui
 | 04:45 | OSM Nominatim/Overpass + Wikipedia lookups | Verified real coordinates of 10 hospitals; corrected 8 (Children's was 1.8 km off) |
 | 04:55 | `deploy.ps1 -Seed` | Reseeded corrected data; added /ambulances (nearby map); removed placeholder Call buttons |
 | 05:10 | `deploy.ps1` + live check of 22 routes/intents | All pass on CloudFront + API; staff example now built per facility |
+| 05:35 | OSM Overpass query for Lahore hospitals | Found real private hospitals; added 9 with general ERs at OSM coordinates |
+| 05:40 | `deploy.ps1 -Seed` | 19 hospitals live (9 private), government/private filter, 'simulated data' tags; Bahria Town now routes to Bahria International (6 min) vs nearest govt (50 min) |

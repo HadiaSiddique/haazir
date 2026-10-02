@@ -207,7 +207,7 @@ def hospital_card(f, lat, lon, dept=None):
     last = max([r.get("updatedAt", 0) for g in ("beds", "doctors", "equipment") for r in f[g].values()] or [0])
     return {
         "id": f["id"], "name": f["name"], "nameUr": f.get("nameUr"), "lat": f["lat"], "lon": f["lon"],
-        "phone": f.get("phone"), "sehatCard": f.get("sehatCard"),
+        "phone": f.get("phone"), "sehatCard": f.get("sehatCard"), "ownership": f.get("ownership", "government"),
         "femaleDoctor": any(d["gender"] == "F" for d in (dept_docs if dept else on_duty)),
         "distanceKm": round(km, 1), "etaMin": eta_min(km), "erLoad": er_load(f),
         "department": dept, "freeBeds": free_beds(f, dept) if dept else None,
@@ -220,7 +220,7 @@ def hospital_card(f, lat, lon, dept=None):
     }
 
 
-def rank_hospitals(snap, lat, lon, dept=None, equipment=None, female=False, sehat=False, red_flag=False):
+def rank_hospitals(snap, lat, lon, dept=None, equipment=None, female=False, sehat=False, red_flag=False, ownership=None):
     dept = dept or ("Emergency" if red_flag else None)
     results = []
     for f in snap["facilities"].values():
@@ -229,6 +229,8 @@ def rank_hospitals(snap, lat, lon, dept=None, equipment=None, female=False, seha
         if dept and dept not in f["beds"]:
             continue
         if sehat and not f.get("sehatCard"):
+            continue
+        if ownership and f.get("ownership", "government") != ownership:
             continue
         card = hospital_card(f, lat, lon, dept)
         score, why = 0.0, []

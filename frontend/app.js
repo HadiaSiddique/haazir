@@ -124,6 +124,7 @@
 
   function bedClass(free, total) { if (free == null) return "x"; if (free === 0) return "r"; if (free <= Math.max(2, total * 0.1)) return "a"; return "g"; }
   const eqPill = (k, e) => { const c = e.status === "working" ? "g" : e.status === "busy" ? "a" : "r"; const lbl = e.status === "working" ? L_("working", "چالو") : e.status === "busy" ? L_("busy", "مصروف") : L_("down", "خراب"); return `<span class="pill ${c} ${e.stale ? "stale" : ""}">${k}: ${lbl}</span>`; };
+  const ownPill = (o) => (o === "private" ? `<span class="pill a">💳 ${L_("Private · fees apply", "پرائیویٹ · فیس")}</span>` : `<span class="pill o">🏛️ ${L_("Government · free", "سرکاری · مفت")}</span>`);
   const loadPill = (l) => `<span class="pill ${l === "Low" ? "g" : l === "Busy" ? "a" : "r"}">ER ${l === "Low" ? L_("calm", "کم رش") : l === "Busy" ? L_("busy", "مصروف") : L_("full", "بھرا ہوا")}</span>`;
 
   function hospitalCard(h, i, opts) {
@@ -140,8 +141,8 @@
         <div class="big ${bedClass(free, total)} ${stale ? "stale" : ""}">${free == null ? "?" : free}<small>${d ? L_("free beds", "خالی بستر") + "<br>" + esc(dept(d)) : L_("free beds", "خالی بستر")}</small></div>
         <div class="grow">
           <h3>${esc(state.lang === "ur" && h.nameUr ? h.nameUr : h.name)}</h3>
-          <div class="muted small">${h.distanceKm} km · ~${h.etaMin} ${L_("min by road", "منٹ")} · ${L_("updated", "اپ ڈیٹ")} ${ago(h.updatedAt)}${stale ? staleNote(0) : ""}</div>
-          <div class="pills">${loadPill(h.erLoad)}${h.sehatCard ? `<span class="pill o">Sehat Card</span>` : ""}${h.femaleDoctor ? `<span class="pill o">♀ ${L_("Female doctor", "لیڈی ڈاکٹر")}</span>` : ""}${keyEq.map((k) => eqPill(k, h.equipment[k])).join("")}</div>
+          <div class="muted small">${h.distanceKm} km · ~${h.etaMin} ${L_("min by road", "منٹ")} · ${L_("updated", "اپ ڈیٹ")} ${ago(h.updatedAt)}${stale ? staleNote(0) : ""} <span class="pill x">${L_("simulated data", "فرضی ڈیٹا")}</span></div>
+          <div class="pills">${ownPill(h.ownership)}${loadPill(h.erLoad)}${h.sehatCard ? `<span class="pill o">Sehat Card</span>` : ""}${h.femaleDoctor ? `<span class="pill o">♀ ${L_("Female doctor", "لیڈی ڈاکٹر")}</span>` : ""}${keyEq.map((k) => eqPill(k, h.equipment[k])).join("")}</div>
           <div class="small">🩺 ${docs || L_("No doctor on duty listed", "کوئی ڈاکٹر ڈیوٹی پر نہیں")}</div>
           ${h.why ? `<div class="why">${L_("Why:", "وجہ:")} ${esc(h.why)}</div>` : ""}
         </div>
@@ -234,7 +235,7 @@
       🕒 ${L_("Every number shows when it was last updated. Anything older than 2 hours is greyed out and marked 'may be outdated'.", "ہر معلومات کے ساتھ وقت درج ہے؛ 2 گھنٹے سے پرانی معلومات مدھم دکھائی جاتی ہے۔")}<br>
       🧮 ${L_("AI only understands language. A simple, explainable formula decides the ranking.", "AI صرف زبان سمجھتا ہے؛ فیصلہ ایک سادہ فارمولا کرتا ہے۔")}<br>
       🚨 ${L_("Danger signs always show Rescue 1122 first. Haazir never diagnoses.", "خطرے کی علامات پر ہمیشہ پہلے 1122۔ حاضر تشخیص نہیں کرتا۔")}<br>
-      ⚠️ <b>${L_("This pilot uses simulated data for 10 Lahore public hospitals, 18 pharmacies, 6 blood banks and 12 ambulances.", "یہ پائلٹ فرضی ڈیٹا استعمال کرتا ہے۔")}</b>
+      ⚠️ <b>${L_("Pilot: the 10 government and 9 private hospitals are real, at their real locations. Their beds, doctors (fictional names), machine status, plus the 18 pharmacies, 6 blood banks and 12 ambulances, are simulated, because no live public data exists yet. That is the gap Haazir fills.", "پائلٹ: 10 سرکاری اور 9 پرائیویٹ ہسپتال اصل ہیں؛ بستر، ڈاکٹر، مشینیں، فارمیسیاں، خون اور ایمبولینس فرضی ہیں۔")}</b>
     </div>`;
     const form = document.getElementById("askForm"), q = document.getElementById("q");
     form.onsubmit = (e) => { e.preventDefault(); if (q.value.trim()) location.hash = "#/ask?q=" + encodeURIComponent(q.value.trim()); };
@@ -246,7 +247,7 @@
       const c = s.counters || {};
       const el = document.getElementById("liveStats");
       if (el) el.innerHTML = [
-        [s.freeBedsTotal, L_("free beds in 10 hospitals", "خالی بستر")],
+        [s.freeBedsTotal, L_(`free beds in ${s.hospitals} hospitals`, "خالی بستر")],
         [`${s.ambulancesAvailable}/${s.ambulancesTotal}`, L_("demo ambulances available", "ایمبولینس دستیاب")],
         [s.machinesDown.length, L_("machines down right now", "مشینیں خراب")],
         [c.estMinutesSaved || 0, L_("est. minutes saved for families", "منٹ بچائے گئے")],
@@ -304,19 +305,21 @@
   }
 
   async function hospitalsPage(params) {
-    const sel = { dept: params.get("dept") || "Emergency", female: params.get("female") === "1", sehat: params.get("sehat") === "1" };
+    const sel = { dept: params.get("dept") || "Emergency", female: params.get("female") === "1", sehat: params.get("sehat") === "1", type: params.get("type") || "" };
     $app.innerHTML = `<h1>🛏️ ${L_("Hospital beds right now", "اس وقت ہسپتال بستر")}</h1>${locationRow(true)}
       <div class="chips" id="deptChips">${DEPTS.map((d) => `<button class="chip ${d === sel.dept ? "on" : ""}" data-d="${d}">${esc(dept(d))}</button>`).join("")}</div>
+      <div class="chips">${[["", L_("All hospitals", "تمام")], ["government", "🏛️ " + L_("Government (free)", "سرکاری (مفت)")], ["private", "💳 " + L_("Private (fees)", "پرائیویٹ (فیس)")]].map(([v, l]) => `<button class="chip ${sel.type === v ? "on" : ""}" data-own="${v}">${l}</button>`).join("")}</div>
       <div class="chips"><button class="chip ${sel.sehat ? "on" : ""}" id="fSehat">Sehat Card</button><button class="chip ${sel.female ? "on" : ""}" id="fFem">♀ ${L_("Female doctor", "لیڈی ڈاکٹر")}</button></div>
       <div id="res">${skeleton(3)}</div>`;
-    const go = () => { location.hash = `#/hospitals?dept=${encodeURIComponent(sel.dept)}${sel.female ? "&female=1" : ""}${sel.sehat ? "&sehat=1" : ""}`; };
+    const go = () => { location.hash = `#/hospitals?dept=${encodeURIComponent(sel.dept)}${sel.female ? "&female=1" : ""}${sel.sehat ? "&sehat=1" : ""}${sel.type ? "&type=" + sel.type : ""}`; };
+    $app.querySelectorAll("[data-own]").forEach((b) => b.onclick = () => { sel.type = b.dataset.own; go(); });
     $app.querySelectorAll("[data-d]").forEach((b) => b.onclick = () => { sel.dept = b.dataset.d; go(); });
     document.getElementById("fSehat").onclick = () => { sel.sehat = !sel.sehat; go(); };
     document.getElementById("fFem").onclick = () => { sel.female = !sel.female; go(); };
     bindLocation(() => hospitalsPage(params));
     const res = document.getElementById("res");
     try {
-      const d = await api(`/hospitals?${locQ()}&dept=${encodeURIComponent(sel.dept)}${sel.female ? "&female=1" : ""}${sel.sehat ? "&sehat=1" : ""}`);
+      const d = await api(`/hospitals?${locQ()}&dept=${encodeURIComponent(sel.dept)}${sel.female ? "&female=1" : ""}${sel.sehat ? "&sehat=1" : ""}${sel.type ? "&type=" + sel.type : ""}`);
       res.innerHTML = d.hospitals.length ? d.hospitals.map((h, i) => hospitalCard(h, i)).join("") : `<div class="empty">${L_("No hospital matches these filters.", "ان فلٹرز کے ساتھ کوئی ہسپتال نہیں۔")}</div>`;
       bindActions(res);
     } catch (e) { res.innerHTML = errBox(e); }
@@ -327,7 +330,7 @@
     try {
       const f = await api(`/facility/${encodeURIComponent(id)}?${locQ()}`);
       let html = `<a href="javascript:history.back()" class="small">← ${L_("Back", "واپس")}</a><h1>${esc(state.lang === "ur" && f.nameUr ? f.nameUr : f.name)}</h1>
-        <div class="muted">${f.distanceKm} km ${f.etaMin ? "· ~" + f.etaMin + " min" : ""} ${f.erLoad ? "· " + loadPill(f.erLoad) : ""}</div>
+        <div class="muted">${f.distanceKm} km ${f.etaMin ? "· ~" + f.etaMin + " min" : ""} ${f.type === "hospital" ? ownPill(f.ownership) : ""} ${f.erLoad ? loadPill(f.erLoad) : ""} <span class="pill x">${L_("simulated data", "فرضی ڈیٹا")}</span></div>
         <div class="btns"><a class="btn p" target="_blank" rel="noopener" href="${dirUrl(f.lat, f.lon)}">🧭 ${L_("Directions", "راستہ")}</a>${f.type === "hospital" ? `<button class="btn" data-notify="${f.id}" data-dept="Emergency" data-name="${esc(f.name)}" data-eta="${f.etaMin}">🔔 ${L_("Notify hospital", "اطلاع دیں")}</button>` : ""}</div>`;
       if (f.beds && Object.keys(f.beds).length) {
         html += `<h2>${L_("Beds by department", "شعبہ وار بستر")}</h2><div class="card"><table class="t"><tr><th>${L_("Department", "شعبہ")}</th><th>${L_("Free", "خالی")}</th><th>${L_("Total", "کل")}</th><th>${L_("Updated", "اپ ڈیٹ")}</th></tr>` +
@@ -715,7 +718,7 @@
         if (layers) {
           Object.values(layers).forEach((l) => l.clearLayers());
           mp.facilities.forEach((f) => {
-            if (f.type === "hospital") window.L.circleMarker([f.lat, f.lon], { radius: 11, weight: 2, color: "#fff", fillColor: f.capacity < 0.8 ? "#138a4a" : f.capacity < 0.95 ? "#b26a00" : "#c62828", fillOpacity: .95 }).addTo(layers.hosp).bindPopup(`<b>${esc(f.name)}</b><br>${f.freeBeds} ${L_("free beds", "خالی بستر")} · ER ${esc(f.erLoad)}<br><a href="#/facility/${f.id}">${L_("Details", "تفصیل")}</a>`);
+            if (f.type === "hospital") window.L.circleMarker([f.lat, f.lon], { radius: 11, weight: 2, color: "#fff", fillColor: f.capacity < 0.8 ? "#138a4a" : f.capacity < 0.95 ? "#b26a00" : "#c62828", fillOpacity: .95 }).addTo(layers.hosp).bindPopup(`<b>${esc(f.name)}</b><br>${f.ownership === "private" ? L_("Private · fees", "پرائیویٹ") : L_("Government · free", "سرکاری")}<br>${f.freeBeds} ${L_("free beds", "خالی بستر")} · ER ${esc(f.erLoad)}<br><a href="#/facility/${f.id}">${L_("Details", "تفصیل")}</a>`);
             else if (f.type === "bloodbank") window.L.circleMarker([f.lat, f.lon], { radius: 7, color: "#7b5cd6", fillOpacity: .9 }).addTo(layers.bb).bindPopup(esc(f.name));
             else window.L.circleMarker([f.lat, f.lon], { radius: 5, color: "#8a96a0", fillOpacity: .8 }).addTo(layers.ph).bindPopup(esc(f.name));
           });
