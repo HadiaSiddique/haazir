@@ -23,3 +23,6 @@ Every important AWS command run by the coding agent (Claude Code) during the bui
 | 05:10 | `deploy.ps1` + live check of 22 routes/intents | All pass on CloudFront + API; staff example now built per facility |
 | 05:35 | OSM Overpass query for Lahore hospitals | Found real private hospitals; added 9 with general ERs at OSM coordinates |
 | 05:40 | `deploy.ps1 -Seed` | 19 hospitals live (9 private), government/private filter, 'simulated data' tags; Bahria Town now routes to Bahria International (6 min) vs nearest govt (50 min) |
+| 06:00 | OSM Overpass (amenity=pharmacy) + web search for blood banks | 71 real pharmacies and 6 real blood banks replace fictional ones |
+| 06:20 | Rebuilt data model + `deploy.ps1 -Seed` | Availability now only from staff reports; 1,143 simulated rows deleted from DynamoDB; simulator Lambda + EventBridge schedule removed |
+| 06:30 | Live checks | 19 hospitals / 71 pharmacies / 6 blood banks; 0 invented beds or machines; demo story test passes |

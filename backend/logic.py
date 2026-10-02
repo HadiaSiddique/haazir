@@ -1,4 +1,7 @@
-"""Deterministic, explainable logic. AI understands language; this code decides."""
+"""Deterministic, explainable logic. AI understands language; this code decides.
+
+Availability (beds, doctors on duty, machines, stock, blood) comes ONLY from staff reports. When nothing has been
+reported, the value is unknown and is shown as "not reported", never as zero or "down"."""
 import math
 import re
 import time
@@ -100,7 +103,7 @@ def keyword_understand(text):
     u = re.search(r"(\d+)\s*(bottle|botal|bag|unit|pint)", t)
     if u:
         ent["units"] = int(u.group(1))
-    for key, name, salt, strength, price in MEDICINES:
+    for key, name, salt, strength in MEDICINES:
         brand = name.split()[0].lower()
         if len(brand) > 3 and brand in t and name not in ent["medicines"]:
             ent["medicines"].append(name.split(" (")[0])
@@ -183,119 +186,112 @@ def understand(text):
     return intent, ent, source
 
 
-# ---------------------------------------------------------------- hospitals
+# ---------------------------------------------------------------- hospitals (reported data only)
+
+def reported_free(f, dept):
+    """Free beds as last reported by staff, or None if never reported."""
+    b = f["beds"].get(dept)
+    return None if not b else int(b.get("free", 0))
+
 
 def er_load(f):
-    b = f["beds"].get("Emergency")
-    if not b:
+    free = reported_free(f, "Emergency")
+    if free is None:
         return "Unknown"
-    r = b["occupied"] / max(1, b["total"])
-    return "Low" if r < 0.75 else ("Busy" if r < 0.95 else "Full")
-
-
-def free_beds(f, dept):
-    b = f["beds"].get(dept)
-    return None if not b else max(0, b["total"] - b["occupied"])
+    return "Full" if free == 0 else ("Busy" if free <= 3 else "Low")
 
 
 def hospital_card(f, lat, lon, dept=None):
     km = haversine(lat, lon, f["lat"], f["lon"])
     on_duty = [d for d in f["doctors"].values() if d.get("onDuty")]
-    dept_docs = [d for d in on_duty if not dept or d["dept"] == dept]
-    beds = {k: {"free": max(0, v["total"] - v["occupied"]), "total": v["total"], "updatedAt": v["updatedAt"],
+    dept_docs = [d for d in on_duty if not dept or d.get("dept") == dept]
+    beds = {k: {"free": int(v.get("free", 0)), "updatedAt": v.get("updatedAt"), "updatedBy": v.get("updatedBy"),
                 "stale": not fresh(v)} for k, v in f["beds"].items()}
-    last = max([r.get("updatedAt", 0) for g in ("beds", "doctors", "equipment") for r in f[g].values()] or [0])
+    reports = [r.get("updatedAt", 0) for g in ("beds", "doctors", "equipment") for r in f[g].values()]
     return {
         "id": f["id"], "name": f["name"], "nameUr": f.get("nameUr"), "lat": f["lat"], "lon": f["lon"],
-        "phone": f.get("phone"), "sehatCard": f.get("sehatCard"), "ownership": f.get("ownership", "government"),
-        "femaleDoctor": any(d["gender"] == "F" for d in (dept_docs if dept else on_duty)),
+        "ownership": f.get("ownership", "government"), "departments": f.get("departments", []),
         "distanceKm": round(km, 1), "etaMin": eta_min(km), "erLoad": er_load(f),
-        "department": dept, "freeBeds": free_beds(f, dept) if dept else None,
+        "department": dept, "freeBeds": reported_free(f, dept) if dept else None,
         "beds": beds,
-        "doctorsOnDuty": [{"name": d["name"], "dept": d["dept"], "gender": d["gender"], "shiftEnds": d.get("shiftEnds")}
+        "doctorsOnDuty": [{"name": d["name"], "dept": d.get("dept"), "gender": d.get("gender"), "shiftEnds": d.get("shiftEnds")}
                           for d in (dept_docs or on_duty)][:4],
-        "equipment": {k: {"status": v["status"], "queue": v.get("queue", 0), "stale": not fresh(v),
-                          "updatedAt": v["updatedAt"]} for k, v in f["equipment"].items()},
-        "updatedAt": last,
+        "femaleDoctor": any(d.get("gender") == "F" for d in (dept_docs if dept else on_duty)),
+        "equipment": {k: {"status": v["status"], "stale": not fresh(v), "updatedAt": v.get("updatedAt")}
+                      for k, v in f["equipment"].items()},
+        "hasReports": bool(reports), "updatedAt": max(reports) if reports else None,
     }
 
 
 def rank_hospitals(snap, lat, lon, dept=None, equipment=None, female=False, sehat=False, red_flag=False, ownership=None):
+    """Rank by what is KNOWN. Unknown availability is neutral (no bonus, no penalty); distance always counts."""
     dept = dept or ("Emergency" if red_flag else None)
     results = []
     for f in snap["facilities"].values():
         if f["type"] != "hospital":
             continue
-        if dept and dept not in f["beds"]:
-            continue
-        if sehat and not f.get("sehatCard"):
+        if dept and dept not in f.get("departments", []):
             continue
         if ownership and f.get("ownership", "government") != ownership:
             continue
         card = hospital_card(f, lat, lon, dept)
         score, why = 0.0, []
-        fb = card["freeBeds"]
         if dept:
-            if fb == 0:
+            why.append(f"has {dept}")
+            fb = card["freeBeds"]
+            if fb is None:
+                why.append("beds not reported yet")
+            elif fb == 0:
                 score -= 100
-                why.append(f"no free {dept} beds")
+                why.append(f"staff report no free {dept} beds")
             else:
-                score += min(fb, 5) * 4  # diminishing: 5+ free beds is "enough"
-                why.append(f"{fb} free {dept} beds")
-            specialists = [d for d in f["doctors"].values() if d.get("onDuty") and d["dept"] == dept]
+                score += 30 + min(fb, 5) * 3
+                why.append(f"staff report {fb} free {dept} beds")
+            specialists = [d for d in f["doctors"].values() if d.get("onDuty") and d.get("dept") == dept]
             if specialists:
                 score += 25
-                why.append(f"{specialists[0]['name']} on duty")
-            else:
-                score -= 30
-                why.append(f"no {dept} doctor on duty")
+                why.append(f"{specialists[0]['name']} reported on duty")
         if female:
-            fem = [d for d in f["doctors"].values() if d.get("onDuty") and d["gender"] == "F"
-                   and (not dept or d["dept"] == dept)]
+            fem = [d for d in f["doctors"].values() if d.get("onDuty") and d.get("gender") == "F"
+                   and (not dept or d.get("dept") == dept)]
             if fem:
-                score += 15
-                why.append(f"female doctor {fem[0]['name']} on duty")
-            else:
-                score -= 40
+                score += 20
+                why.append(f"female doctor {fem[0]['name']} reported on duty")
         if equipment:
             e = f["equipment"].get(equipment)
             if not e:
-                score -= 60
+                why.append(f"{equipment} status not reported")
             elif e["status"] == "working":
-                score += 15
-                why.append(f"{equipment} working")
+                score += 20
+                why.append(f"{equipment} reported working")
             elif e["status"] == "busy":
-                score += 3
-                why.append(f"{equipment} busy (queue {e.get('queue', 0)})")
+                score += 5
+                why.append(f"{equipment} reported busy")
             else:
-                score -= 40
-                why.append(f"{equipment} down")
-        load = card["erLoad"]
-        score += {"Low": 10, "Busy": 0, "Full": -35 if red_flag else -15}.get(load, 0)
-        if load == "Full":
-            why.append("ER full")
+                score -= 60
+                why.append(f"{equipment} reported down")
+        if card["erLoad"] == "Full":
+            score -= 35 if red_flag else 15
         score -= card["etaMin"] * (2.5 if red_flag else 1.2)  # in emergencies every minute counts more
         card["score"] = round(score, 1)
         card["why"] = ", ".join(why[:3]) + f" · {card['etaMin']} min away"
-        has_specialist = not dept or any(d.get("onDuty") and d["dept"] == dept for d in f["doctors"].values())
-        card["canHelp"] = ((fb is None or fb > 0) and has_specialist
-                           and not (equipment and f["equipment"].get(equipment, {}).get("status", "down") == "down"))
         results.append(card)
     results.sort(key=lambda c: -c["score"])
     return results
 
 
 def minutes_saved(results):
-    """+25 when the nearest relevant facility could not help and we routed elsewhere."""
+    """Count ~25 min when the nearest relevant hospital has REPORTED it cannot help and we routed elsewhere."""
     if len(results) < 2:
         return 0
     nearest = min(results, key=lambda c: c["distanceKm"])
-    return 25 if (not nearest["canHelp"] and results[0]["id"] != nearest["id"]) else 0
+    reported_full = nearest["freeBeds"] == 0
+    return 25 if (reported_full and results[0]["id"] != nearest["id"]) else 0
 
 
 # ---------------------------------------------------------------- medicine
 
-CATALOG = {k: {"key": k, "name": n, "salt": s, "strength": st, "priceRs": p} for k, n, s, st, p in MEDICINES}
+CATALOG = {k: {"key": k, "name": n, "salt": s, "strength": st} for k, n, s, st in MEDICINES}
 
 
 def match_medicine(q):
@@ -334,36 +330,38 @@ def same_salt(key):
 def medicine_search(snap, q, lat, lon):
     keys = match_medicine(q)
     if not keys:
-        return {"query": q, "matched": [], "pharmacies": [], "alternatives": [], "dispensaries": []}
+        return {"query": q, "matched": [], "pharmacies": [], "alternatives": [], "reportingPharmacies": 0}
     primary = keys[0]
     alt_keys = [k for k in same_salt(primary) if k != primary]
-    pharmacies, dispensaries = [], []
+    pharmacies, reporting = [], 0
     for f in snap["facilities"].values():
-        if f["type"] not in ("pharmacy", "hospital"):
+        if f["type"] != "pharmacy":
             continue
-        km = haversine(lat, lon, f["lat"], f["lon"])
+        if f["medicine"]:
+            reporting += 1
         stock = []
         for k in [primary] + alt_keys:
             r = f["medicine"].get(k)
-            if r and r.get("inStock") and r.get("qty", 0) > 0:
-                stock.append({"key": k, "name": r["name"], "qty": r["qty"], "priceRs": r["priceRs"],
-                              "exact": k == primary, "stale": not fresh(r), "updatedAt": r["updatedAt"]})
+            if r and r.get("qty", 0) > 0:
+                stock.append({"key": k, "name": CATALOG[k]["name"], "qty": r["qty"], "priceRs": r.get("priceRs"),
+                              "exact": k == primary, "stale": not fresh(r), "updatedAt": r.get("updatedAt")})
         if not stock:
             continue
-        row = {"id": f["id"], "name": f["name"], "type": f["type"], "lat": f["lat"], "lon": f["lon"],
-               "distanceKm": round(km, 1), "etaMin": eta_min(km), "open24h": f.get("open24h"),
-               "hasExact": any(s["exact"] for s in stock), "stock": stock}
-        (dispensaries if f["type"] == "hospital" else pharmacies).append(row)
+        km = haversine(lat, lon, f["lat"], f["lon"])
+        pharmacies.append({"id": f["id"], "name": f["name"], "lat": f["lat"], "lon": f["lon"],
+                           "distanceKm": round(km, 1), "etaMin": eta_min(km),
+                           "hasExact": any(s["exact"] for s in stock), "stock": stock})
     pharmacies.sort(key=lambda p: (not p["hasExact"], p["distanceKm"]))
-    dispensaries.sort(key=lambda p: p["distanceKm"])
-    alts = sorted([CATALOG[k] for k in alt_keys], key=lambda m: m["priceRs"])
-    return {"query": q, "matched": [CATALOG[primary]], "alternatives": alts,
-            "pharmacies": pharmacies[:12], "dispensaries": dispensaries[:4],
+    nearby = sorted(({"id": f["id"], "name": f["name"], "lat": f["lat"], "lon": f["lon"],
+                      "distanceKm": round(haversine(lat, lon, f["lat"], f["lon"]), 1)}
+                     for f in snap["facilities"].values() if f["type"] == "pharmacy"), key=lambda p: p["distanceKm"])[:8]
+    return {"query": q, "matched": [CATALOG[primary]], "alternatives": [CATALOG[k] for k in alt_keys],
+            "pharmacies": pharmacies[:12], "nearbyPharmacies": nearby, "reportingPharmacies": reporting,
             "note": "Same active ingredient and strength only. Confirm with your doctor or pharmacist before switching."}
 
 
 def medicine_plan(snap, names, lat, lon):
-    """Find one pharmacy with everything, else fewest stops (greedy set cover by distance)."""
+    """Using REPORTED stock only: one pharmacy with everything, else fewest stops (greedy set cover)."""
     wanted = []
     for n in names[:10]:
         ks = match_medicine(n)
@@ -377,8 +375,8 @@ def medicine_plan(snap, names, lat, lon):
         for k in keys:
             for alt in [k] + [a for a in same_salt(k) if a != k]:
                 r = f["medicine"].get(alt)
-                if r and r.get("inStock") and r.get("qty", 0) > 0:
-                    have[k] = {"key": alt, "name": r["name"], "priceRs": r["priceRs"], "substitute": alt != k}
+                if r and r.get("qty", 0) > 0:
+                    have[k] = {"key": alt, "name": CATALOG[alt]["name"], "priceRs": r.get("priceRs"), "substitute": alt != k}
                     break
         if have:
             km = haversine(lat, lon, f["lat"], f["lon"])
@@ -388,8 +386,7 @@ def medicine_plan(snap, names, lat, lon):
     full_exact = [s for s in full if not any(v["substitute"] for v in s["have"].values())]
     pick = sorted(full_exact or full, key=lambda s: s["distanceKm"])
     if keys and pick:
-        s = pick[0]
-        stops = [s]
+        stops = [pick[0]]
     else:
         stops, remaining = [], set(keys)
         while remaining and shops:
@@ -399,12 +396,13 @@ def medicine_plan(snap, names, lat, lon):
                 break
             stops.append({**best, "have": {k: best["have"][k] for k in got}})
             remaining -= got
-    total = sum(v["priceRs"] for s in stops for v in s["have"].values())
+    prices = [v["priceRs"] for s in stops for v in s["have"].values()]
     covered = {k for s in stops for k in s["have"]}
     return {"items": wanted, "stops": stops, "onePharmacy": len(stops) == 1 and len(covered) == len(set(keys)) > 0,
             "missing": [w for w in wanted if not w["key"] or w["key"] not in covered],
-            "totalRs": total,
-            "note": "Substitutes have the same active ingredient and strength. Confirm with your doctor or pharmacist before switching."}
+            "totalRs": sum(prices) if prices and all(p is not None for p in prices) else None,
+            "note": "Based only on stock reported by pharmacists. Substitutes have the same active ingredient and "
+                    "strength. Confirm with your doctor or pharmacist before switching."}
 
 
 RX_PROMPT = """You read photos of prescriptions or medicine packs from Pakistan. List ONLY the medicines you can read.
@@ -423,14 +421,16 @@ def blood_search(snap, group, units, lat, lon):
         if f["type"] != "bloodbank":
             continue
         km = haversine(lat, lon, f["lat"], f["lon"])
-        exact = f["blood"].get(group, {}).get("units", 0)
-        comp = {g: f["blood"].get(g, {}).get("units", 0) for g in compat if g != group}
-        updated = max([r.get("updatedAt", 0) for r in f["blood"].values()] or [0])
+        reported = bool(f["blood"])
+        exact = f["blood"][group]["units"] if group in f["blood"] else None
+        comp = {g: f["blood"][g]["units"] for g in compat if g != group and g in f["blood"] and f["blood"][g]["units"] > 0}
+        updated = max([r.get("updatedAt", 0) for r in f["blood"].values()] or [0]) or None
         banks.append({"id": f["id"], "name": f["name"], "lat": f["lat"], "lon": f["lon"],
-                      "distanceKm": round(km, 1), "etaMin": eta_min(km), "exactUnits": exact,
-                      "compatibleUnits": {g: u for g, u in comp.items() if u > 0},
-                      "enough": exact >= units, "updatedAt": updated, "stale": now() - updated > STALE_SECONDS})
-    banks.sort(key=lambda b: (not b["enough"], b["exactUnits"] == 0, b["distanceKm"]))
+                      "locationPrecision": f.get("locationPrecision", "exact"),
+                      "distanceKm": round(km, 1), "etaMin": eta_min(km), "reported": reported,
+                      "exactUnits": exact, "compatibleUnits": comp, "enough": exact is not None and exact >= units,
+                      "updatedAt": updated, "stale": bool(updated) and now() - updated > STALE_SECONDS})
+    banks.sort(key=lambda b: (not b["enough"], not b["reported"], b["distanceKm"]))
     return {"group": group, "units": units, "compatibleGroups": compat, "banks": banks,
             "compatNote": "Standard ABO/Rh red-cell compatibility. The blood bank will cross-match before transfusion."}
 
@@ -441,153 +441,156 @@ def equipment_search(snap, etype, lat, lon):
     etype = etype if etype in EQUIP_TYPES else "CT"
     rows = []
     for f in snap["facilities"].values():
-        e = f["equipment"].get(etype) if f["type"] == "hospital" else None
-        if not e:
+        if f["type"] != "hospital":
             continue
+        e = f["equipment"].get(etype)
         km = haversine(lat, lon, f["lat"], f["lon"])
-        q = e.get("queue", 0)
         rows.append({"id": f["id"], "name": f["name"], "lat": f["lat"], "lon": f["lon"],
-                     "distanceKm": round(km, 1), "etaMin": eta_min(km), "status": e["status"], "queue": q,
-                     "waitMin": q * 15 if e["status"] != "down" else None, "updatedAt": e["updatedAt"],
-                     "stale": not fresh(e)})
-    order = {"working": 0, "busy": 1, "down": 2}
-    rows.sort(key=lambda r: (order[r["status"]], r["etaMin"] + (r["waitMin"] or 0)))
+                     "ownership": f.get("ownership", "government"), "distanceKm": round(km, 1), "etaMin": eta_min(km),
+                     "status": e["status"] if e else "unknown", "updatedAt": e.get("updatedAt") if e else None,
+                     "stale": bool(e) and not fresh(e)})
+    order = {"working": 0, "busy": 1, "unknown": 2, "down": 3}
+    rows.sort(key=lambda r: (order[r["status"]], r["etaMin"]))
     return {"type": etype, "results": rows}
-
-
-# ---------------------------------------------------------------- ambulance
-
-def pick_ambulance(snap, lat, lon, als):
-    avail = [a for a in snap["ambulances"].values() if a["status"] == "available"]
-    pool = [a for a in avail if a["type"] == "ALS"] if als else []
-    pool = pool or avail
-    if not pool:
-        return None
-    return min(pool, key=lambda a: haversine(lat, lon, a["lat"], a["lon"]))
-
-
-def ambulance_progress(req):
-    """Simulated position: interpolate from start to patient, then patient to hospital."""
-    t = now() - req["createdAt"]
-    to_patient = req["toPatientSec"]
-    to_hosp = req["toHospitalSec"]
-    s, p, h = (req["startLat"], req["startLon"]), (req["lat"], req["lon"]), (req["destLat"], req["destLon"])
-    timeline = [{"status": "assigned", "at": req["createdAt"]}]
-    if t < 8:
-        pos, status, eta = s, "assigned", to_patient
-    elif t < to_patient:
-        k = (t - 8) / max(1, to_patient - 8)
-        pos, status, eta = (s[0] + (p[0] - s[0]) * k, s[1] + (p[1] - s[1]) * k), "en_route", to_patient - t
-    elif t < to_patient + 30:
-        pos, status, eta = p, "arrived", 0
-    elif t < to_patient + 30 + to_hosp:
-        k = (t - to_patient - 30) / max(1, to_hosp)
-        pos, status, eta = (p[0] + (h[0] - p[0]) * k, p[1] + (h[1] - p[1]) * k), "to_hospital", to_patient + 30 + to_hosp - t
-    else:
-        pos, status, eta = h, "at_hospital", 0
-    for st, at in [("en_route", 8), ("arrived", to_patient), ("to_hospital", to_patient + 30),
-                   ("at_hospital", to_patient + 30 + to_hosp)]:
-        if t >= at:
-            timeline.append({"status": st, "at": req["createdAt"] + at})
-    return {"status": status, "lat": pos[0], "lon": pos[1], "etaSec": max(0, int(eta)), "timeline": timeline}
 
 
 # ---------------------------------------------------------------- staff updates
 
 STAFF_PROMPT = """You convert short hospital/pharmacy/blood-bank staff messages (Urdu, Roman Urdu or English) into structured updates.
-Facility resources (use ONLY these keys):
+Facility: {facility}
+Allowed keys:
 {resources}
 Reply ONLY JSON: {{"changes":[...], "summaryEn":"...", "summaryUr":"..."}} where each change is one of:
 {{"kind":"bed","key":"<department>","free":<int free beds>}}
-{{"kind":"doctor","key":"<doctor key>","onDuty":true|false,"shiftEnds":"HH:MM" or null}}
+{{"kind":"doctor","name":"Dr <name as written>","dept":"<department or null>","gender":"F"|"M"|null,"onDuty":true|false,"shiftEnds":"HH:MM" or null}}
 {{"kind":"equipment","key":"<CT|MRI|XRay|Dialysis|Ventilator|Oxygen>","status":"working"|"down"|"busy"}}
-{{"kind":"medicine","key":"<medicine key>","qty":<int>}}  (khatam / out of stock = 0; "20 packs aa gaye" = 20)
+{{"kind":"medicine","key":"<medicine key>","qty":<int>,"priceRs":<int or null>}}  (khatam / out of stock = 0; "20 packs aa gaye" = 20)
 {{"kind":"blood","key":"<group>","units":<int>}}
-Times like "8 baje" mean 20:00 if it is about evening duty, else 08:00. Do not invent changes that the message does not state."""
+Times like "8 baje" mean 20:00 if it is about evening duty, else 08:00. ONLY include changes the message states. Never invent."""
 
 
 def facility_resources_text(f):
     lines = []
-    if f["beds"]:
-        lines.append("beds: " + ", ".join(f"{k} (total {v['total']})" for k, v in f["beds"].items()))
-    if f["doctors"]:
-        lines.append("doctors: " + ", ".join(f"{k} = {v['name']} ({v['dept']})" for k, v in f["doctors"].items()))
-    if f["equipment"]:
-        lines.append("equipment: " + ", ".join(f["equipment"].keys()))
-    if f["medicine"]:
-        lines.append("medicine keys: " + ", ".join(f"{k} = {v['name']}" for k, v in f["medicine"].items()))
-    if f["blood"]:
-        lines.append("blood groups: " + ", ".join(f["blood"].keys()))
+    if f["type"] == "hospital":
+        lines.append("departments: " + ", ".join(f.get("departments", [])))
+        lines.append("equipment: " + ", ".join(EQUIP_TYPES))
+        if f["doctors"]:
+            lines.append("doctors already listed: " + ", ".join(f"{v['name']} ({v.get('dept')})" for v in f["doctors"].values()))
+    if f["type"] == "pharmacy":
+        lines.append("medicine keys: " + ", ".join(f"{k} = {v['name']}" for k, v in CATALOG.items()))
+    if f["type"] == "bloodbank":
+        lines.append("blood groups: " + ", ".join(BLOOD_GROUPS))
     return "\n".join(lines)
+
+
+def _doctor_key(name):
+    return re.sub(r"[^a-z0-9]+", "-", name.lower().replace("dr ", "").replace("dr.", "")).strip("-")[:40] or "doctor"
 
 
 def keyword_parse_staff(f, text):
     t = text.lower()
     changes = []
-    for d in f["beds"]:
-        dl = d.lower().split("/")[0]
-        m = re.search(rf"{re.escape(dl[:5])}\w*[^.,]*?(\d+)\s*(bed|beds|bistar)[^.,]*?(khali|free|available)", t)
-        if m:
-            changes.append({"kind": "bed", "key": d, "free": int(m.group(1))})
-        elif re.search(rf"{re.escape(dl[:5])}\w*[^.,]*?(full|bhar|koi bed nahi)", t):
-            changes.append({"kind": "bed", "key": d, "free": 0})
-    for e in f["equipment"]:
-        if re.search(rf"\b{e.lower()}\b[^.,]*?(kharab|down|band|out of order|not working)", t):
-            changes.append({"kind": "equipment", "key": e, "status": "down"})
-        elif re.search(rf"\b{e.lower()}\b[^.,]*?(theek|working|chal raha|fixed|on)", t):
-            changes.append({"kind": "equipment", "key": e, "status": "working"})
-    for k, d in f["doctors"].items():
-        first = d["name"].lower().replace("dr ", "").split()[0]
-        if re.search(rf"\b{first}\b[^.,]*?(off duty|chali gay|chale gay|leave|chutti|\boff\b)", t):
-            changes.append({"kind": "doctor", "key": k, "onDuty": False, "shiftEnds": None})
-        elif re.search(rf"\b{first}\b[^.,]*?(duty|\bon\b|aa gay|available)", t):
-            hm = re.search(rf"\b{first}\b[^.,]*?(\d{{1,2}})\s*baje", t)
-            shift = None
-            if hm:
-                h = int(hm.group(1))
-                shift = f"{h + 12 if h < 12 and h >= 5 else h:02d}:00"
-            changes.append({"kind": "doctor", "key": k, "onDuty": True, "shiftEnds": shift})
-
-    for k, m in f["medicine"].items():
-        brand = m["name"].split()[0].lower()
-        if re.search(rf"\b{brand}\b[^.,]*?(khatam|out of stock|nahi hai|finished)", t):
-            changes.append({"kind": "medicine", "key": k, "qty": 0})
-        else:
-            q = re.search(rf"\b{brand}\b[^.,]*?(\d+)\s*(pack|packs|box|dabba|strip)", t)
+    if f["type"] == "hospital":
+        for d in f.get("departments", []):
+            dl = d.lower().split("/")[0]
+            m = re.search(rf"{re.escape(dl[:5])}\w*[^.,]*?(\d+)\s*(bed|beds|bistar)[^.,]*?(khali|free|available)", t)
+            if m:
+                changes.append({"kind": "bed", "key": d, "free": int(m.group(1))})
+            elif re.search(rf"{re.escape(dl[:5])}\w*[^.,]*?(full|bhar|koi bed nahi|no bed)", t):
+                changes.append({"kind": "bed", "key": d, "free": 0})
+        for e in EQUIP_TYPES:
+            pat = r"x-?ray" if e == "XRay" else rf"\b{e.lower()}\b"
+            if re.search(rf"{pat}[^.,]*?(kharab|down|band|out of order|not working)", t):
+                changes.append({"kind": "equipment", "key": e, "status": "down"})
+            elif re.search(rf"{pat}[^.,]*?(busy|rush|line)", t):
+                changes.append({"kind": "equipment", "key": e, "status": "busy"})
+            elif re.search(rf"{pat}[^.,]*?(theek|working|chal raha|fixed|chalu)", t):
+                changes.append({"kind": "equipment", "key": e, "status": "working"})
+        for m in re.finditer(r"\bdr\.?\s+([a-z]+(?:\s+[a-z]+)?)([^.,]*)", t):
+            name_words = [w for w in m.group(1).split() if w not in ("ki", "ka", "ke", "ko", "aaj", "abhi")]
+            rest = m.group(2)
+            if not name_words:
+                continue
+            name = "Dr " + " ".join(w.capitalize() for w in name_words[:2] if not re.match(r"^\d", w))
+            # department named next to the doctor, else the ward named elsewhere in the same message
+            dept = next((d for d in f.get("departments", []) if d.lower().split("/")[0][:5] in rest), None) or \
+                next((d for d in f.get("departments", []) if d != "Emergency" and d.lower().split("/")[0][:5] in t), None)
+            if re.search(r"off|chali gay|chale gay|leave|chutti|nahi", rest):
+                changes.append({"kind": "doctor", "name": name, "dept": dept, "onDuty": False})
+            elif re.search(r"duty|on\b|aa gay|available|maujood", rest):
+                hm = re.search(r"(\d{1,2})\s*baje", rest)
+                shift = None
+                if hm:
+                    h = int(hm.group(1))
+                    shift = f"{h + 12 if 5 <= h < 12 else h:02d}:00"
+                changes.append({"kind": "doctor", "name": name, "dept": dept, "onDuty": True, "shiftEnds": shift})
+    if f["type"] == "pharmacy":
+        for k, m in CATALOG.items():
+            brand = m["name"].split()[0].lower()
+            if re.search(rf"\b{re.escape(brand)}\b[^.,]*?(khatam|out of stock|nahi hai|finished)", t):
+                changes.append({"kind": "medicine", "key": k, "qty": 0})
+            else:
+                q = re.search(rf"\b{re.escape(brand)}\b[^.,]*?(\d+)\s*(pack|packs|box|dabba|strip)", t)
+                if q:
+                    changes.append({"kind": "medicine", "key": k, "qty": int(q.group(1))})
+    if f["type"] == "bloodbank":
+        for g in BLOOD_GROUPS:
+            q = re.search(rf"(?<![a-z]){re.escape(g.lower())}\s*[^.,]*?(\d+)\s*(unit|bag|bottle)", t)
             if q:
-                changes.append({"kind": "medicine", "key": k, "qty": int(q.group(1))})
-    for g in f["blood"]:
-        q = re.search(rf"{re.escape(g.lower())}\s*[^.,]*?(\d+)\s*(unit|bag|bottle)", t)
-        if q:
-            changes.append({"kind": "blood", "key": g, "units": int(q.group(1))})
-    return changes
+                changes.append({"kind": "blood", "key": g, "units": int(q.group(1))})
+    # keep first change per (kind, key/name)
+    seen, out = set(), []
+    for c in changes:
+        k = (c["kind"], c.get("key") or c.get("name"))
+        if k not in seen:
+            seen.add(k)
+            out.append(c)
+    return out
 
 
 def validate_changes(f, changes):
-    """Keep only changes that refer to real resources of this facility, with sane values."""
+    """Keep only changes that fit this facility, with sane values. Returns normalized changes with labels."""
     ok = []
+    depts = f.get("departments", [])
     for c in changes if isinstance(changes, list) else []:
         if not isinstance(c, dict):
             continue
         kind, key = c.get("kind"), c.get("key")
         try:
-            if kind == "bed" and key in f["beds"]:
-                free = max(0, min(int(c["free"]), f["beds"][key]["total"]))
+            if kind == "bed" and f["type"] == "hospital" and key in depts:
+                free = max(0, min(int(c["free"]), 500))
+                was = f["beds"].get(key, {}).get("free")
                 ok.append({"kind": "bed", "key": key, "free": free,
-                           "label": f"{key}: {free} free beds (was {f['beds'][key]['total'] - f['beds'][key]['occupied']})"})
-            elif kind == "doctor" and key in f["doctors"]:
+                           "label": f"{key}: {free} free beds" + (f" (was {was})" if was is not None else " (first report)")})
+            elif kind == "doctor" and f["type"] == "hospital":
+                name = str(c.get("name") or "").strip()
+                existing = f["doctors"].get(key) if key else None
+                if existing and not name:
+                    name = existing["name"]
+                if not re.match(r"^(Dr\.?\s+)?[A-Za-z][A-Za-z .'-]{1,40}$", name):
+                    continue
+                if not name.lower().startswith("dr"):
+                    name = "Dr " + name
+                dkey = key if existing else _doctor_key(name)
+                prev = f["doctors"].get(dkey, {})
+                dept = c.get("dept") if c.get("dept") in depts else prev.get("dept")
+                gender = c.get("gender") if c.get("gender") in ("F", "M") else prev.get("gender")
                 on = bool(c.get("onDuty"))
                 sh = c.get("shiftEnds") if isinstance(c.get("shiftEnds"), str) and re.match(r"^\d{2}:\d{2}$", c.get("shiftEnds") or "") else None
-                ok.append({"kind": "doctor", "key": key, "onDuty": on, "shiftEnds": sh,
-                           "label": f"{f['doctors'][key]['name']}: {'on duty' if on else 'off duty'}" + (f" until {sh}" if sh and on else "")})
-            elif kind == "equipment" and key in f["equipment"] and c.get("status") in ("working", "down", "busy"):
+                ok.append({"kind": "doctor", "key": dkey, "name": name, "dept": dept, "gender": gender, "onDuty": on,
+                           "shiftEnds": sh, "label": f"{name}{' (' + dept + ')' if dept else ''}: "
+                                                     f"{'on duty' if on else 'off duty'}" + (f" until {sh}" if sh and on else "")})
+            elif kind == "equipment" and f["type"] == "hospital" and key in EQUIP_TYPES and c.get("status") in ("working", "down", "busy"):
+                was = f["equipment"].get(key, {}).get("status")
                 ok.append({"kind": "equipment", "key": key, "status": c["status"],
-                           "label": f"{key}: {c['status']} (was {f['equipment'][key]['status']})"})
-            elif kind == "medicine" and key in f["medicine"]:
+                           "label": f"{key}: {c['status']}" + (f" (was {was})" if was else " (first report)")})
+            elif kind == "medicine" and f["type"] == "pharmacy" and key in CATALOG:
                 q = max(0, min(int(c["qty"]), 10000))
-                ok.append({"kind": "medicine", "key": key, "qty": q,
-                           "label": f"{f['medicine'][key]['name']}: {q if q else 'out of stock'}"})
-            elif kind == "blood" and key in f["blood"]:
+                price = c.get("priceRs")
+                price = int(price) if isinstance(price, (int, float)) and 0 < price < 100000 else f["medicine"].get(key, {}).get("priceRs")
+                ok.append({"kind": "medicine", "key": key, "qty": q, "priceRs": price,
+                           "label": f"{CATALOG[key]['name']}: {q if q else 'out of stock'}" + (f" · Rs {price}" if price else "")})
+            elif kind == "blood" and f["type"] == "bloodbank" and key in BLOOD_GROUPS:
                 u = max(0, min(int(c["units"]), 500))
                 ok.append({"kind": "blood", "key": key, "units": u, "label": f"Blood {key}: {u} units"})
         except (TypeError, ValueError, KeyError):

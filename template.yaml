@@ -1,6 +1,6 @@
 AWSTemplateFormatVersion: "2010-09-09"
 Transform: AWS::Serverless-2016-10-31
-Description: Haazir - Pakistan's live healthcare availability network (pilot, simulated data)
+Description: Haazir - Pakistan's healthcare availability network (real facilities, staff-reported availability)
 
 Parameters:
   ModelId:
@@ -10,10 +10,6 @@ Parameters:
     Type: String
     Default: "1234"
     NoEcho: true
-  DemoMode:
-    Type: String
-    Default: "true"
-    AllowedValues: ["true", "false"]
   EnableCdn:
     Type: String
     Default: "false"
@@ -32,7 +28,6 @@ Globals:
         TABLE_NAME: !Ref DataTable
         MODEL_ID: !Ref ModelId
         STAFF_PIN: !Ref StaffPin
-        DEMO_MODE: !Ref DemoMode
 
 Resources:
   DataTable:
@@ -90,22 +85,6 @@ Resources:
             ApiId: !Ref HttpApi
             Path: /
             Method: GET
-
-  SimulatorFunction:
-    Type: AWS::Serverless::Function
-    Properties:
-      FunctionName: haazir-simulator
-      CodeUri: backend/
-      Handler: handler.api
-      Timeout: 300
-      Policies:
-        - DynamoDBCrudPolicy: { TableName: !Ref DataTable }
-      Events:
-        Every5Min:
-          Type: Schedule
-          Properties:
-            Schedule: rate(5 minutes)
-            Input: '{"action": "simulate"}'
 
   SiteBucket:
     Condition: UseCdn

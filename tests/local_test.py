@@ -1,70 +1,108 @@
-import json, os, sys
+"""Offline test with a fake DynamoDB: real facilities only, availability only from staff reports."""
+import json
+import os
+import sys
+
 sys.path.insert(0, os.path.dirname(__file__))
-import fakes  # noqa: F401  (installs fake boto3)
+import fakes  # noqa: F401,E402  (installs fake boto3)
 import handler  # noqa: E402
 
+FAIL = []
 
-def call(method, path, body=None, q=None):
+
+def call(method, path, body=None, q=None, expect=200):
     ev = {"requestContext": {"http": {"method": method}}, "rawPath": path, "queryStringParameters": q,
           "body": json.dumps(body) if body is not None else None}
     r = handler.api(ev)
     data = json.loads(r["body"])
-    print(f"{method} {path} -> {r['statusCode']}")
-    if r["statusCode"] >= 400:
+    ok = r["statusCode"] == expect
+    print(f"{'OK ' if ok else 'BAD'} {method} {path} -> {r['statusCode']}")
+    if not ok:
+        FAIL.append(path)
         print("   ", data)
     return data
 
 
+def check(cond, msg):
+    print(("   ok  " if cond else "   BAD ") + msg)
+    if not cond:
+        FAIL.append(msg)
+
+
+# old simulated rows must be wiped by the reset
+fakes.STORE[("FACILITY#hosp-mayo", "RES#bed#ICU")] = {"pk": "FACILITY#hosp-mayo", "sk": "RES#bed#ICU", "kind": "bed", "key": "ICU", "total": 16, "occupied": 16}
+fakes.STORE[("AMBULANCE#amb-01", "META")] = {"pk": "AMBULANCE#amb-01", "sk": "META", "id": "amb-01"}
 print(handler.api({"action": "seed"}))
-L = {"lat": 31.52, "lon": 74.35}
-r = call("POST", "/ask", {"text": "abbu ko seenay mein dard", **L})
-print("   intent", r["intent"], "redFlag", r["entities"]["redFlag"], "dept", r["entities"]["department"])
-print("   top:", r["hospitals"][0]["name"], "|", r["hospitals"][0]["why"])
-for t in ["O negative blood chahiye 2 bottle", "Augmentin kahan milegi Johar Town", "CT scan kahan ho raha hai abhi",
-          "lady doctor gynae", "ambulance chahiye", "bachay ko tez bukhar hai"]:
-    r = call("POST", "/ask", {"text": t, **L})
-    ex = r.get("hospitals", [{}])[0].get("name") if r.get("hospitals") else (
-        (r.get("medicine") or {}).get("pharmacies", [{}])[0].get("name") if r.get("medicine") else
-        (r.get("blood") or {}).get("banks", [{}])[0].get("name") if r.get("blood") else
-        (r.get("equipment") or {}).get("results", [{}])[0].get("name"))
-    print(f"   '{t}' -> {r['intent']} {r['entities'].get('bloodGroup') or ''} {r['entities'].get('department') or ''} :: {ex}")
-call("GET", "/hospitals", q={"dept": "ICU", **L})
-f = call("GET", "/facility/hosp-mayo", q=L)
-print("   beds", list(f["beds"].items())[:2])
-a = call("POST", "/ambulance/request", {"condition": "chest pain, unconscious", **L})
-print("   ", a)
-s = call("GET", f"/ambulance/request/{a['requestId']}")
-print("   status", s["status"], s["etaSec"])
-call("POST", "/notify", {"facilityId": "hosp-mayo", "department": "Medicine", "note": "fever", "eta": 20})
-m = call("GET", "/medicine/search", q={"q": "augmentin", **L})
-print("   alts", [x["name"] for x in m["alternatives"]], "pharmacies", len(m["pharmacies"]))
-p = call("POST", "/medicine/plan", {"items": ["Augmentin 625", "Panadol", "Risek 20mg", "Glucophage"], **L})
-print("   onePharmacy", p["onePharmacy"], [s["name"] for s in p["stops"]], p["totalRs"])
-b = call("GET", "/blood/search", q={"group": "O-", "units": "2", **L})
-print("   blood top", b["banks"][0]["name"], b["banks"][0]["exactUnits"])
-br = call("POST", "/blood/request", {"group": "O-", "units": 2, "hospital": "Mayo Hospital"})
-print("   ", br["message"])
-e = call("GET", "/equipment", q={"type": "MRI", **L})
-print("   MRI", [(x["name"], x["status"]) for x in e["results"]][:3])
-sp = call("POST", "/staff/parse", {"facilityId": "hosp-mayo", "pin": "1234",
-                                   "text": "Medicine ward 3 mein 2 bed khali, CT kharab hai, Dr Sana 8 baje tak duty pe"})
-print("   parsed", [c["label"] for c in sp["changes"]])
-up = call("POST", "/staff/update", {"facilityId": "hosp-mayo", "pin": "1234", "changes": sp["changes"]})
-print("   applied", len(up["applied"]))
-ph = call("POST", "/staff/parse", {"facilityId": "ph-gulberg", "pin": "1234", "text": "Panadol khatam, Augmentin 20 packs aa gaye"})
-print("   pharmacy parsed", [c["label"] for c in ph["changes"]])
-call("POST", "/staff/update", {"facilityId": "hosp-mayo", "pin": "1234", "changes": [{"kind": "bed", "key": "ICU", "delta": 1}]})
-call("POST", "/staff/update", {"facilityId": "hosp-mayo", "pin": "0000", "changes": []})
-al = call("POST", "/staff/alerts", {"facilityId": "hosp-mayo", "pin": "1234"})
-print("   alerts", len(al["alerts"]))
-call("POST", "/staff/alerts/ack", {"facilityId": "hosp-mayo", "pin": "1234", "sk": al["alerts"][0]["sk"]})
+check(("AMBULANCE#amb-01", "META") not in fakes.STORE, "simulated ambulance removed")
+check(("FACILITY#hosp-mayo", "RES#bed#ICU") not in fakes.STORE, "simulated bed row removed")
+
+L = {"lat": 31.5204, "lon": 74.3487}
 st = call("GET", "/stats")
-print("   stats", st["freeBedsTotal"], st["ambulancesAvailable"], st["bloodShortages"], st["counters"])
+check(st["hospitals"] == 19 and st["privateHospitals"] == 9, f"19 hospitals, 9 private ({st['hospitals']}, {st['privateHospitals']})")
+check(st["pharmacies"] >= 50, f"real pharmacies loaded ({st['pharmacies']})")
+check(st["hospitalsReporting"] == 0 and st["reportedFreeBeds"] == 0, "nothing reported before staff report")
+
+r = call("POST", "/ask", {"text": "abbu ko seenay mein dard", **L})
+check(r["entities"]["redFlag"] and r["entities"]["department"] == "Cardiology", "chest pain -> red flag, Cardiology")
+check(all(h["freeBeds"] is None for h in r["hospitals"]), "no invented bed numbers")
+check(all(not h["equipment"] and not h["doctorsOnDuty"] for h in r["hospitals"]), "no invented machines or doctors")
+print("    top:", r["hospitals"][0]["name"], "|", r["hospitals"][0]["why"])
+for t in ["O negative blood chahiye 2 bottle", "Augmentin kahan milegi Johar Town", "CT scan kahan ho raha hai abhi",
+          "lady doctor gynae", "ambulance chahiye", "bachay ko tez bukhar hai", "emergency"]:
+    a = call("POST", "/ask", {"text": t, **L})
+    print(f"    '{t}' -> {a['intent']} {a['entities'].get('bloodGroup') or ''} {a['entities'].get('department') or ''}")
+
+b = call("GET", "/blood/search", q={"group": "O-", "units": "2", **L})
+check(all(x["exactUnits"] is None for x in b["banks"]), "blood units not invented")
+m = call("GET", "/medicine/search", q={"q": "augmentin", **L})
+check(not m["pharmacies"] and m["nearbyPharmacies"], "no invented stock, nearest real pharmacies listed")
+e = call("GET", "/equipment", q={"type": "CT", **L})
+check(all(x["status"] == "unknown" for x in e["results"]), "machine status unknown until reported")
+
+# staff report flow (hospital)
+sp = call("POST", "/staff/parse", {"facilityId": "hosp-mayo", "pin": "1234",
+                                   "text": "Medicine ward mein 2 bed khali, CT kharab hai, Dr Sana 8 baje tak duty pe"})
+print("    parsed:", [c["label"] for c in sp["changes"]])
+check(len(sp["changes"]) == 3, "hospital message -> 3 changes")
+call("POST", "/staff/update", {"facilityId": "hosp-mayo", "pin": "1234", "changes": sp["changes"]})
+call("POST", "/staff/update", {"facilityId": "hosp-mayo", "pin": "1234", "changes": [{"kind": "bed", "key": "Emergency", "free": 0}]})
+call("POST", "/staff/update", {"facilityId": "hosp-mayo", "pin": "1234", "changes": [{"kind": "bed", "key": "Emergency", "delta": 2}]})
+call("POST", "/staff/update", {"facilityId": "hosp-pic", "pin": "1234", "changes": [{"kind": "bed", "key": "Cardiology", "free": 4},
+     {"kind": "doctor", "name": "Dr Ayesha Malik", "dept": "Cardiology", "gender": "F", "onDuty": True, "shiftEnds": "22:00"}]})
+f = call("GET", "/facility/hosp-mayo", q=L)
+check(f["beds"]["Medicine"]["free"] == 2 and f["beds"]["Emergency"]["free"] == 2, "reported beds stored (Medicine 2, Emergency 0+2)")
+check(f["equipment"]["CT"]["status"] == "down" and any(d["name"] == "Dr Sana" for d in f["doctors"]), "CT down + Dr Sana reported")
+r = call("POST", "/ask", {"text": "abbu ko seenay mein dard", **L})
+print("    top after reports:", r["hospitals"][0]["name"], "|", r["hospitals"][0]["why"])
+check(r["hospitals"][0]["id"] == "hosp-pic", "PIC (reported 4 cardiology beds + cardiologist) ranks first")
+fl = call("GET", "/hospitals", q={"dept": "Cardiology", "female": "1", **L})
+check(any(h["femaleDoctor"] for h in fl["hospitals"]), "female doctor filter finds reported female doctor")
+call("POST", "/staff/update", {"facilityId": "hosp-mayo", "pin": "0000", "changes": []}, expect=403)
+call("POST", "/staff/parse", {"facilityId": "ph-01", "pin": "1234", "text": "x"})
+# pharmacy + blood bank
+ph = call("POST", "/staff/parse", {"facilityId": "ph-04", "pin": "1234", "text": "Panadol khatam, Augmentin 20 packs aa gaye"})
+print("    pharmacy parsed:", [c["label"] for c in ph["changes"]])
+check(len(ph["changes"]) == 2, "pharmacy message -> 2 changes")
+call("POST", "/staff/update", {"facilityId": "ph-04", "pin": "1234", "changes": ph["changes"]})
+m = call("GET", "/medicine/search", q={"q": "augmentin", **L})
+check(m["pharmacies"] and m["pharmacies"][0]["id"] == "ph-04", "reported stock found")
+p = call("POST", "/medicine/plan", {"items": ["Augmentin 625"], **L})
+check(p["onePharmacy"], "plan finds the pharmacy that reported")
+bb = call("POST", "/staff/parse", {"facilityId": "bb-sundas", "pin": "1234", "text": "O- 2 unit, B+ 10 unit"})
+print("    blood parsed:", [c["label"] for c in bb["changes"]])
+call("POST", "/staff/update", {"facilityId": "bb-sundas", "pin": "1234", "changes": bb["changes"]})
+b = call("GET", "/blood/search", q={"group": "O-", "units": "2", **L})
+check(b["banks"][0]["id"] == "bb-sundas" and b["banks"][0]["exactUnits"] == 2, "reported blood found first")
+call("POST", "/notify", {"facilityId": "hosp-pic", "department": "Cardiology", "note": "chest pain", "eta": 12, "byAmbulance": True})
+al = call("POST", "/staff/alerts", {"facilityId": "hosp-pic", "pin": "1234"})
+check(len(al["alerts"]) == 1, "hospital alert received")
+call("POST", "/staff/alerts/ack", {"facilityId": "hosp-pic", "pin": "1234", "sk": al["alerts"][0]["sk"]})
+call("POST", "/blood/request", {"group": "O-", "units": 2, "hospital": "Mayo Hospital"})
+st = call("GET", "/stats")
+check(st["hospitalsReporting"] == 2, f"2 hospitals reporting ({st['hospitalsReporting']})")
 call("GET", "/map")
-amb = call("GET", "/ambulances", q=L)
-print("   ambulances", amb["available"], "/", amb["total"], "nearest", amb["nearest"]["id"], amb["nearest"]["distanceKm"], "km")
-print(handler.api({"action": "seed"}))
 call("GET", "/facilities")
-print(handler.api({"action": "simulate"}))
-call("POST", "/ask", {"text": ""})
-call("GET", "/nope")
+call("GET", "/helplines")
+call("POST", "/ask", {"text": ""}, expect=400)
+call("GET", "/nope", expect=404)
+print("\nFAILURES:", FAIL if FAIL else "none")

@@ -1,4 +1,5 @@
-/* Haazir frontend: hash-routed single page, no build step. */
+/* Haazir frontend: hash-routed single page, no build step.
+   Facilities are real. Availability is shown ONLY when staff have reported it; otherwise "not reported yet". */
 (function () {
   "use strict";
   const API = (window.HAAZIR_API || "").replace(/\/$/, "");
@@ -14,6 +15,7 @@
   const DEPT_UR = { "Emergency": "ایمرجنسی", "Medicine": "میڈیسن", "Surgery": "سرجری", "Cardiology": "دل (کارڈیالوجی)", "Paediatrics": "بچے", "Gynae/Obstetrics": "زچگی / گائنی", "Orthopaedics": "ہڈی (آرتھو)", "ICU": "آئی سی یو", "Burns": "جلنا (برنز)" };
   const EQUIP = ["CT", "MRI", "XRay", "Dialysis", "Ventilator", "Oxygen"];
   const GROUPS = ["O+", "O-", "A+", "A-", "B+", "B-", "AB+", "AB-"];
+  const HELPLINES = [["1122", "Rescue 1122", "ریسکیو 1122"], ["115", "Edhi Ambulance", "ایدھی ایمبولینس"]];
 
   function store(k, v) { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (e) { return null; } }
   const state = { lang: store("lang") || "en", loc: null, staff: null };
@@ -29,11 +31,14 @@
     const m = Math.max(0, Math.round((nowS() - ts) / 60));
     if (m < 1) return L_("just now", "ابھی");
     if (m < 60) return L_(`${m} min ago`, `${m} منٹ پہلے`);
-    return L_(`${Math.round(m / 60)} h ago`, `${Math.round(m / 60)} گھنٹے پہلے`);
+    if (m < 2880) return L_(`${Math.round(m / 60)} h ago`, `${Math.round(m / 60)} گھنٹے پہلے`);
+    return L_(`${Math.round(m / 1440)} days ago`, `${Math.round(m / 1440)} دن پہلے`);
   }
   const staleNote = (ts) => (ts && nowS() - ts > 7200 ? ` <span class="stale-note">${L_("may be outdated", "پرانی معلومات ہو سکتی ہے")}</span>` : "");
   const dirUrl = (lat, lon) => `https://www.google.com/maps/dir/?api=1&destination=${lat},${lon}`;
   const locQ = () => `lat=${state.loc.lat}&lon=${state.loc.lon}`;
+  const NR = () => L_("not reported yet", "ابھی رپورٹ نہیں");
+  const nrPill = (what) => `<span class="pill x">${esc(what)}: ${NR()}</span>`;
 
   async function api(path, opts) {
     const ctl = new AbortController();
@@ -60,11 +65,9 @@
     const m = window.L.map(el, { scrollWheelZoom: false }).setView(center, zoom || 12);
     window.L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 18, attribution: "© OpenStreetMap" }).addTo(m);
     maps.push(m);
-    // the container may not have its final size yet; re-measure after layout
-    setTimeout(() => { try { m.invalidateSize(); } catch (e) {} }, 150);
+    setTimeout(() => { try { m.invalidateSize(); } catch (e) {} }, 150); // re-measure after layout
     return m;
   }
-  const dotIcon = (emoji) => window.L.divIcon({ className: "", html: `<div style="font-size:24px;line-height:24px">${emoji}</div>`, iconSize: [24, 24], iconAnchor: [12, 12] });
   function youMarker(m) { if (m) window.L.circleMarker([state.loc.lat, state.loc.lon], { radius: 8, color: "#fff", weight: 3, fillColor: "#1e66f5", fillOpacity: 1 }).addTo(m).bindPopup(L_("You", "آپ")); }
 
   const skeleton = (n) => Array.from({ length: n || 3 }, () => '<div class="skel"></div>').join("");
@@ -74,7 +77,7 @@
   function chrome() {
     document.documentElement.lang = state.lang === "ur" ? "ur" : "en";
     document.documentElement.dir = state.lang === "ur" ? "rtl" : "ltr";
-    document.getElementById("pilot").textContent = L_("⚠️ Pilot demo: hospital names and locations are real; beds, doctors, stock, blood and ambulances are simulated.", "⚠️ پائلٹ ڈیمو: ہسپتالوں کے نام اور مقام اصل ہیں؛ بستر، ڈاکٹر، اسٹاک، خون اور ایمبولینس فرضی ہیں۔");
+    document.getElementById("pilot").textContent = L_("Pilot: real Lahore hospitals, pharmacies and blood banks. Beds, doctors, machines, stock and blood appear only when staff report them.", "پائلٹ: لاہور کے اصل ہسپتال، فارمیسیاں اور بلڈ بینک۔ بستر، ڈاکٹر، مشینیں، دوا اور خون صرف اسٹاف کی رپورٹ کے بعد دکھائے جاتے ہیں۔");
     const r = location.hash.split("?")[0];
     const link = (h, en, ur, cls) => `<a href="${h}" class="${cls || ""} ${r === h ? "on" : ""}">${L_(en, ur)}</a>`;
     document.getElementById("nav").innerHTML =
@@ -83,7 +86,7 @@
       link("#/staff", "Staff", "اسٹاف") +
       `<button class="lang" id="langBtn">${state.lang === "ur" ? "English" : "اردو"}</button>`;
     document.getElementById("langBtn").onclick = () => { state.lang = state.lang === "ur" ? "en" : "ur"; store("lang", state.lang); route(); };
-    document.getElementById("foot").innerHTML = `<b>Haazir حاضر</b> · ${L_("Pilot demo for Lahore. All availability data is simulated and is not connected to any real hospital, pharmacy, blood bank or Rescue 1122. In an emergency call", "لاہور کے لیے پائلٹ ڈیمو۔ تمام ڈیٹا فرضی ہے۔ ایمرجنسی میں کال کریں")} <a href="tel:1122">1122</a>. ${L_("Haazir routes you to care. It does not diagnose.", "حاضر تشخیص نہیں کرتا، صرف راستہ دکھاتا ہے۔")} · Built on AWS.`;
+    document.getElementById("foot").innerHTML = `<b>Haazir حاضر</b> · ${L_("Pilot for Lahore. Hospital, pharmacy and blood bank names and locations are real (OpenStreetMap, Wikipedia, public listings). Availability is shown only when staff report it through the staff portal; it is not connected to any hospital system or to Rescue 1122. In an emergency call", "لاہور کے لیے پائلٹ۔ دستیابی صرف اسٹاف کی رپورٹ پر۔ ایمرجنسی میں کال کریں")} <a href="tel:1122">1122</a>. ${L_("Haazir routes you to care. It does not diagnose.", "حاضر تشخیص نہیں کرتا، صرف راستہ دکھاتا ہے۔")} · Map data © OpenStreetMap contributors · Built on AWS.`;
   }
 
   // ------------------------------------------------------------ shared blocks
@@ -109,66 +112,58 @@
   }
   function setLoc(l) { state.loc = l; store("loc", JSON.stringify(l)); const el = document.getElementById("locLabel"); if (el) el.textContent = l.label; }
 
-  function redBanner(condition, reason) {
+  const helplineBtns = (white) => HELPLINES.map(([n, en, ur], i) => `<a class="btn ${i === 0 ? (white ? "w" : "d") : ""}" ${i && white ? 'style="background:transparent;color:#fff;border-color:#fff"' : ""} href="tel:${n}">📞 ${L_(en, ur)}: ${n}</a>`).join("");
+
+  function redBanner(reason, best) {
     return `<div class="alert-red">
-      <h2>🚨 ${L_("Emergency: call Rescue 1122 now", "ایمرجنسی: ابھی ریسکیو 1122 کو کال کریں")}</h2>
+      <h2>🚨 ${L_("Emergency: call an ambulance now", "ایمرجنسی: ابھی ایمبولینس بلائیں")}</h2>
       <div>${esc(reason ? L_("Warning sign: ", "خطرے کی علامت: ") + reason : "")}</div>
-      <div class="btns">
-        <a class="btn w" href="tel:1122">📞 ${L_("Call Rescue 1122", "ریسکیو 1122 کال کریں")}</a>
-        <button class="btn" style="background:transparent;color:#fff" data-amb="${esc(condition || "")}">🚑 ${L_("Request ambulance (demo)", "ایمبولینس منگوائیں (ڈیمو)")}</button>
-      </div>
-      <div class="small nearestAmb" style="margin-top:8px"></div>
-      <div class="small" style="margin-top:8px;opacity:.9">${L_("Haazir is not a diagnosis. The demo ambulance network is simulated, so always call 1122 first.", "یہ تشخیص نہیں۔ ڈیمو ایمبولینس فرضی ہے، پہلے 1122 کال کریں۔")}</div>
+      <div class="btns">${helplineBtns(true)}</div>
+      ${best ? `<div class="btns"><button class="btn" style="background:transparent;color:#fff;border-color:#fff" data-notify="${best.id}" data-dept="${esc(best.department || "Emergency")}" data-name="${esc(best.name)}" data-eta="${best.etaMin}" data-amb="1">🔔 ${L_("Tell", "اطلاع دیں:")} ${esc(best.name)} ${L_("you're coming", "کہ آپ آ رہے ہیں")}</button></div>` : ""}
+      <div class="small" style="margin-top:8px;opacity:.9">${L_("Haazir is not a diagnosis. Call the ambulance first, then use the list below to choose and alert a hospital.", "یہ تشخیص نہیں۔ پہلے ایمبولینس بلائیں، پھر نیچے سے ہسپتال چنیں۔")}</div>
     </div>`;
   }
 
-  function bedClass(free, total) { if (free == null) return "x"; if (free === 0) return "r"; if (free <= Math.max(2, total * 0.1)) return "a"; return "g"; }
-  const eqPill = (k, e) => { const c = e.status === "working" ? "g" : e.status === "busy" ? "a" : "r"; const lbl = e.status === "working" ? L_("working", "چالو") : e.status === "busy" ? L_("busy", "مصروف") : L_("down", "خراب"); return `<span class="pill ${c} ${e.stale ? "stale" : ""}">${k}: ${lbl}</span>`; };
+  const bedClass = (free) => (free == null ? "x" : free === 0 ? "r" : free <= 3 ? "a" : "g");
+  const eqPill = (k, e) => {
+    if (!e || e.status === "unknown") return nrPill(k);
+    const c = e.status === "working" ? "g" : e.status === "busy" ? "a" : "r";
+    const lbl = e.status === "working" ? L_("working", "چالو") : e.status === "busy" ? L_("busy", "مصروف") : L_("down", "خراب");
+    return `<span class="pill ${c} ${e.stale ? "stale" : ""}">${k}: ${lbl}</span>`;
+  };
   const ownPill = (o) => (o === "private" ? `<span class="pill a">💳 ${L_("Private · fees apply", "پرائیویٹ · فیس")}</span>` : `<span class="pill o">🏛️ ${L_("Government · free", "سرکاری · مفت")}</span>`);
-  const loadPill = (l) => `<span class="pill ${l === "Low" ? "g" : l === "Busy" ? "a" : "r"}">ER ${l === "Low" ? L_("calm", "کم رش") : l === "Busy" ? L_("busy", "مصروف") : L_("full", "بھرا ہوا")}</span>`;
+  const loadPill = (l) => (l === "Unknown" ? "" : `<span class="pill ${l === "Low" ? "g" : l === "Busy" ? "a" : "r"}">ER ${l === "Low" ? L_("has space", "جگہ ہے") : l === "Busy" ? L_("busy", "مصروف") : L_("reported full", "بھرا ہوا")}</span>`);
+  const reportLine = (ts, by) => (ts ? `<span class="pill g">✓ ${L_("reported", "رپورٹ")} ${ago(ts)}${by ? " · " + esc(by) : ""}</span>${staleNote(ts)}` : `<span class="pill x">${L_("No live report yet", "ابھی کوئی رپورٹ نہیں")}</span>`);
 
-  function hospitalCard(h, i, opts) {
-    opts = opts || {};
+  function hospitalCard(h, i) {
     const d = h.department;
-    const free = d ? h.freeBeds : Object.values(h.beds).reduce((s, b) => s + b.free, 0);
-    const total = d ? (h.beds[d] || {}).total : Object.values(h.beds).reduce((s, b) => s + b.total, 0);
+    const reportedBeds = Object.values(h.beds);
+    const free = d ? h.freeBeds : (reportedBeds.length ? reportedBeds.reduce((s, b) => s + b.free, 0) : null);
     const stale = d && h.beds[d] && h.beds[d].stale;
-    const keyEq = ["CT", "MRI", "XRay", "Dialysis", "Ventilator"].filter((k) => h.equipment[k]).slice(0, 4);
-    const docs = (h.doctorsOnDuty || []).slice(0, 2).map((x) => `${esc(x.name)}${x.gender === "F" ? " ♀" : ""} (${esc(dept(x.dept))}${x.shiftEnds ? ", " + L_("until", "تک") + " " + x.shiftEnds : ""})`).join(" · ");
+    const eqKeys = Object.keys(h.equipment);
+    const docs = (h.doctorsOnDuty || []).slice(0, 2).map((x) => `${esc(x.name)}${x.gender === "F" ? " ♀" : ""}${x.dept ? " (" + esc(dept(x.dept)) + (x.shiftEnds ? ", " + L_("until", "تک") + " " + x.shiftEnds : "") + ")" : ""}`).join(" · ");
     return `<div class="card ${i === 0 ? "top1" : ""}">
-      ${i === 0 ? `<div class="pill o" style="margin-bottom:8px">★ ${L_("Best match right now", "اس وقت بہترین")}</div>` : ""}
+      ${i === 0 ? `<div class="pill o" style="margin-bottom:8px">★ ${h.hasReports ? L_("Best match from current reports", "موجودہ رپورٹس کے مطابق بہترین") : L_("Nearest suitable hospital", "قریب ترین موزوں ہسپتال")}</div>` : ""}
       <div class="row">
-        <div class="big ${bedClass(free, total)} ${stale ? "stale" : ""}">${free == null ? "?" : free}<small>${d ? L_("free beds", "خالی بستر") + "<br>" + esc(dept(d)) : L_("free beds", "خالی بستر")}</small></div>
+        <div class="big ${bedClass(free)} ${stale ? "stale" : ""}">${free == null ? "?" : free}<small>${free == null ? L_("beds not<br>reported", "بستر رپورٹ<br>نہیں") : L_("free beds", "خالی بستر") + (d ? "<br>" + esc(dept(d)) : "")}</small></div>
         <div class="grow">
           <h3>${esc(state.lang === "ur" && h.nameUr ? h.nameUr : h.name)}</h3>
-          <div class="muted small">${h.distanceKm} km · ~${h.etaMin} ${L_("min by road", "منٹ")} · ${L_("updated", "اپ ڈیٹ")} ${ago(h.updatedAt)}${stale ? staleNote(0) : ""} <span class="pill x">${L_("simulated data", "فرضی ڈیٹا")}</span></div>
-          <div class="pills">${ownPill(h.ownership)}${loadPill(h.erLoad)}${h.sehatCard ? `<span class="pill o">Sehat Card</span>` : ""}${h.femaleDoctor ? `<span class="pill o">♀ ${L_("Female doctor", "لیڈی ڈاکٹر")}</span>` : ""}${keyEq.map((k) => eqPill(k, h.equipment[k])).join("")}</div>
-          <div class="small">🩺 ${docs || L_("No doctor on duty listed", "کوئی ڈاکٹر ڈیوٹی پر نہیں")}</div>
+          <div class="muted small">${h.distanceKm} km · ~${h.etaMin} ${L_("min by road", "منٹ")}</div>
+          <div class="pills">${ownPill(h.ownership)}${reportLine(h.updatedAt)}${loadPill(h.erLoad)}${h.femaleDoctor ? `<span class="pill o">♀ ${L_("Female doctor reported on duty", "لیڈی ڈاکٹر ڈیوٹی پر")}</span>` : ""}${eqKeys.map((k) => eqPill(k, h.equipment[k])).join("")}</div>
+          <div class="small">🩺 ${docs || `<span class="muted">${L_("Doctors on duty: not reported yet", "ڈیوٹی ڈاکٹر: ابھی رپورٹ نہیں")}</span>`}</div>
           ${h.why ? `<div class="why">${L_("Why:", "وجہ:")} ${esc(h.why)}</div>` : ""}
         </div>
       </div>
       <div class="btns">
         <a class="btn p" target="_blank" rel="noopener" href="${dirUrl(h.lat, h.lon)}">🧭 ${L_("Directions", "راستہ")}</a>
-        <button class="btn" data-notify="${h.id}" data-dept="${esc(d || "Emergency")}" data-name="${esc(h.name)}" data-eta="${h.etaMin}">🔔 ${L_("Notify hospital", "ہسپتال کو اطلاع دیں")}</button>
-        ${opts.redFlag ? `<button class="btn d" data-amb="${esc(opts.condition || "")}" data-dest="${h.id}">🚑 ${L_("Ambulance to here (demo)", "یہاں ایمبولینس (ڈیمو)")}</button>` : ""}
+        <button class="btn" data-notify="${h.id}" data-dept="${esc(d || "Emergency")}" data-name="${esc(h.name)}" data-eta="${h.etaMin}">🔔 ${L_("Tell hospital you're coming", "ہسپتال کو اطلاع دیں")}</button>
         <a class="btn" href="#/facility/${h.id}">${L_("Details", "تفصیل")} →</a>
       </div>
     </div>`;
   }
 
   function bindActions(root) {
-    root.querySelectorAll("[data-amb]").forEach((b) => b.onclick = () => requestAmbulance(b.dataset.amb, b.dataset.dest, b));
     root.querySelectorAll("[data-notify]").forEach((b) => b.onclick = () => notifyModal(b.dataset));
-    root.querySelectorAll(".nearestAmb").forEach(fillNearestAmbulance);
-    root.querySelectorAll("[data-ask]").forEach((b) => b.onclick = () => { location.hash = "#/ask?q=" + encodeURIComponent(b.dataset.ask); });
-  }
-
-  async function requestAmbulance(condition, destId, btn) {
-    if (btn) { btn.disabled = true; btn.textContent = L_("Requesting…", "درخواست بھیجی جا رہی ہے…"); }
-    try {
-      const r = await post("/ambulance/request", { lat: state.loc.lat, lon: state.loc.lon, condition: condition || "Emergency", destinationHospitalId: destId || undefined });
-      location.hash = "#/ambulance/" + r.requestId;
-    } catch (e) { alert(e.message); if (btn) { btn.disabled = false; btn.textContent = "🚑 " + L_("Try again", "دوبارہ"); } }
   }
 
   function modal(html) {
@@ -181,17 +176,18 @@
   }
   function notifyModal(ds) {
     const m = modal(`<h3>🔔 ${L_("Tell", "اطلاع دیں:")} ${esc(ds.name)}</h3>
-      <p class="small muted">${L_("The hospital's staff portal gets an alert so they can prepare. (Pilot demo: alerts go to the demo staff portal only.)", "ہسپتال اسٹاف کو اطلاع ملے گی (ڈیمو)۔")}</p>
+      <p class="small muted">${L_("Sends an alert to this hospital's Haazir staff portal so the team can prepare. Pilot: hospitals see it only if their staff use the portal, so please also call or go directly.", "ہسپتال کے اسٹاف پورٹل پر اطلاع جائے گی۔ پائلٹ: صرف اسی صورت میں نظر آئے گی جب اسٹاف پورٹل استعمال کرے۔")}</p>
       <div class="field"><select id="nDept">${DEPTS.map((d) => `<option ${d === ds.dept ? "selected" : ""} value="${d}">${dept(d)}</option>`).join("")}</select></div>
-      <div class="field"><input id="nNote" maxlength="200" placeholder="${L_("What happened? e.g. high fever, 6 year old", "کیا ہوا؟ مثلاً تیز بخار")}"></div>
+      <div class="field"><input id="nNote" maxlength="200" placeholder="${L_("What happened? e.g. chest pain, 60 year old man", "کیا ہوا؟ مثلاً سینے میں درد")}"></div>
       <div class="field"><input id="nEta" type="number" min="0" max="600" value="${esc(ds.eta || 20)}"> <span class="muted" style="align-self:center">${L_("minutes away", "منٹ دور")}</span></div>
+      <label class="small"><input type="checkbox" id="nAmb" ${ds.amb ? "checked" : ""}> ${L_("Coming by ambulance (1122 / Edhi)", "ایمبولینس سے آ رہے ہیں")}</label>
       <div class="btns"><button class="btn p" id="nSend">${L_("Send alert", "اطلاع بھیجیں")}</button><button class="btn" id="nCancel">${L_("Cancel", "منسوخ")}</button></div><div id="nOut"></div>`);
     m.querySelector("#nCancel").onclick = () => m.remove();
     m.querySelector("#nSend").onclick = async (ev) => {
       ev.target.disabled = true;
       try {
-        const r = await post("/notify", { facilityId: ds.notify, department: m.querySelector("#nDept").value, note: m.querySelector("#nNote").value, eta: +m.querySelector("#nEta").value });
-        m.querySelector("#nOut").innerHTML = `<div class="note">✅ ${L_("Alert sent. Show this reference at the desk:", "اطلاع بھیج دی گئی۔ ریفرنس کوڈ:")} <b style="font-size:20px">${esc(r.referenceCode)}</b></div>`;
+        const r = await post("/notify", { facilityId: ds.notify, department: m.querySelector("#nDept").value, note: m.querySelector("#nNote").value, eta: +m.querySelector("#nEta").value, byAmbulance: m.querySelector("#nAmb").checked });
+        m.querySelector("#nOut").innerHTML = `<div class="note">✅ ${L_("Alert sent to the staff portal. Reference:", "اطلاع بھیج دی گئی۔ ریفرنس:")} <b style="font-size:20px">${esc(r.referenceCode)}</b></div>`;
       } catch (e) { m.querySelector("#nOut").innerHTML = errBox(e); ev.target.disabled = false; }
     };
   }
@@ -206,7 +202,7 @@
     $app.innerHTML = `
     <section class="hero">
       <h1>${L_("Know before you go.", "جانے سے پہلے جانیں۔")}</h1>
-      <p>${L_("Which Lahore hospital has a free bed, a doctor on duty, a working CT scanner, your medicine or O-negative blood, right now? Ask in Urdu or English.", "لاہور کے کس ہسپتال میں ابھی بستر، ڈاکٹر، سی ٹی اسکین، دوا یا خون دستیاب ہے؟ اردو یا انگریزی میں پوچھیں۔")}</p>
+      <p>${L_("Which Lahore hospital has a free bed, a doctor on duty, a working CT scanner, your medicine or O-negative blood? Ask in Urdu or English.", "لاہور کے کس ہسپتال میں بستر، ڈاکٹر، سی ٹی اسکین، دوا یا خون دستیاب ہے؟ اردو یا انگریزی میں پوچھیں۔")}</p>
       <form class="ask" id="askForm"><input id="q" autocomplete="off" maxlength="300" placeholder="${L_("What do you need? e.g. abbu ko seenay mein dard", "آپ کو کیا چاہیے؟")}" aria-label="What do you need"><button type="button" class="mic" id="mic" title="Speak" aria-label="Speak">🎤</button><button class="go">${L_("Find", "تلاش")}</button></form>
       <div class="examples">${ex.map((e) => `<button type="button" data-ex="${esc(e)}">${esc(e)}</button>`).join("")}</div>
       ${locationRow(false)}
@@ -221,36 +217,37 @@
       <a class="tile" href="#/hospitals?female=1&dept=Gynae/Obstetrics"><span class="ic">👩‍⚕️</span>${L_("Lady doctor", "لیڈی ڈاکٹر")}</a>
       <a class="tile" href="#/dashboard"><span class="ic">🗺️</span>${L_("City dashboard", "شہر ڈیش بورڈ")}</a>
     </div>
-    <h2>${L_("Across Lahore right now", "اس وقت لاہور میں")} <span class="pill x">${L_("simulated", "فرضی")}</span></h2>
+    <h2>${L_("Haazir in Lahore right now", "اس وقت لاہور میں حاضر")}</h2>
     <div class="stats" id="liveStats">${'<div class="stat skel" style="height:72px"></div>'.repeat(4)}</div>
     <h2>${L_("How it works", "یہ کیسے کام کرتا ہے")}</h2>
     <div class="steps">
-      <div class="card"><h3>1 · ${L_("Ask in your words", "اپنے الفاظ میں پوچھیں")}</h3><div class="small muted">${L_("Type or speak in Urdu, Roman Urdu or English. AI on Amazon Bedrock understands what you need: bed, ambulance, medicine, blood, test or doctor.", "اردو، رومن اردو یا انگریزی میں لکھیں یا بولیں۔")}</div></div>
-      <div class="card"><h3>2 · ${L_("See what's available", "دیکھیں کیا دستیاب ہے")}</h3><div class="small muted">${L_("A transparent ranking (free beds, doctor on duty, working machines, ER load, travel time) explains why each option is suggested.", "واضح درجہ بندی بتاتی ہے کہ کیوں۔")}</div></div>
-      <div class="card"><h3>3 · ${L_("Go, or get help coming", "جائیں یا مدد منگوائیں")}</h3><div class="small muted">${L_("Directions, call, alert the hospital before you arrive, request an ambulance (demo) or share a blood request on WhatsApp.", "راستہ، کال، ہسپتال کو پیشگی اطلاع، ایمبولینس یا واٹس ایپ پر خون کی درخواست۔")}</div></div>
+      <div class="card"><h3>1 · ${L_("Staff report in one message", "اسٹاف ایک پیغام میں رپورٹ کرے")}</h3><div class="small muted">${L_("Ward staff, pharmacists and blood bank clerks send one Roman-Urdu line, e.g. 'Medicine ward mein 2 bed khali, CT kharab hai'. AI on Amazon Bedrock turns it into updates they confirm.", "وارڈ اسٹاف، فارماسسٹ اور بلڈ بینک ایک لائن بھیجتے ہیں؛ AI اسے اپ ڈیٹ میں بدلتا ہے۔")}</div></div>
+      <div class="card"><h3>2 · ${L_("Families ask in their words", "لوگ اپنے الفاظ میں پوچھیں")}</h3><div class="small muted">${L_("Type or speak in Urdu, Roman Urdu or English. Haazir understands the need: bed, ambulance, medicine, blood, test or doctor.", "اردو، رومن اردو یا انگریزی میں لکھیں یا بولیں۔")}</div></div>
+      <div class="card"><h3>3 · ${L_("See what's known, then go", "جو معلوم ہے دیکھیں، پھر جائیں")}</h3><div class="small muted">${L_("Real hospitals ranked by reported availability and distance, with a 'why'. Directions, tell the hospital you're coming, ambulance helplines, WhatsApp blood requests.", "رپورٹ اور فاصلے کے مطابق اصل ہسپتال، راستہ اور اطلاع۔")}</div></div>
     </div>
-    <h2>${L_("Why you can trust the data", "ڈیٹا پر بھروسہ کیوں")}</h2>
+    <h2>${L_("Why you can trust it", "اس پر بھروسہ کیوں")}</h2>
     <div class="card small">
-      ✅ ${L_("Updated by the people who know: ward staff, pharmacists and blood bank clerks, in one Roman-Urdu message from the staff portal.", "وارڈ اسٹاف، فارماسسٹ اور بلڈ بینک خود ایک پیغام میں اپ ڈیٹ کرتے ہیں۔")}<br>
-      🕒 ${L_("Every number shows when it was last updated. Anything older than 2 hours is greyed out and marked 'may be outdated'.", "ہر معلومات کے ساتھ وقت درج ہے؛ 2 گھنٹے سے پرانی معلومات مدھم دکھائی جاتی ہے۔")}<br>
-      🧮 ${L_("AI only understands language. A simple, explainable formula decides the ranking.", "AI صرف زبان سمجھتا ہے؛ فیصلہ ایک سادہ فارمولا کرتا ہے۔")}<br>
-      🚨 ${L_("Danger signs always show Rescue 1122 first. Haazir never diagnoses.", "خطرے کی علامات پر ہمیشہ پہلے 1122۔ حاضر تشخیص نہیں کرتا۔")}<br>
-      ⚠️ <b>${L_("Pilot: the 10 government and 9 private hospitals are real, at their real locations. Their beds, doctors (fictional names), machine status, plus the 18 pharmacies, 6 blood banks and 12 ambulances, are simulated, because no live public data exists yet. That is the gap Haazir fills.", "پائلٹ: 10 سرکاری اور 9 پرائیویٹ ہسپتال اصل ہیں؛ بستر، ڈاکٹر، مشینیں، فارمیسیاں، خون اور ایمبولینس فرضی ہیں۔")}</b>
+      ✅ ${L_("Only real places: 19 Lahore hospitals (10 government, 9 private), pharmacies from OpenStreetMap, and known blood banks.", "صرف اصل مقامات: 19 ہسپتال، اوپن اسٹریٹ میپ کی فارمیسیاں اور معروف بلڈ بینک۔")}<br>
+      🚫 ${L_("Nothing is invented. If staff haven't reported beds, doctors, machines, stock or blood, Haazir says 'not reported yet', never a made-up number.", "کچھ بھی فرضی نہیں۔ رپورٹ نہ ہو تو 'ابھی رپورٹ نہیں' لکھا جاتا ہے۔")}<br>
+      🕒 ${L_("Every report shows when it was made. Anything older than 2 hours is greyed out as 'may be outdated'.", "ہر رپورٹ کا وقت درج ہے؛ 2 گھنٹے سے پرانی مدھم دکھائی جاتی ہے۔")}<br>
+      🧮 ${L_("AI only understands language. A simple, explainable formula ranks hospitals.", "AI صرف زبان سمجھتا ہے؛ درجہ بندی ایک سادہ فارمولا کرتا ہے۔")}<br>
+      🚨 ${L_("Danger signs always show Rescue 1122 and Edhi 115 first. Haazir never diagnoses.", "خطرے کی علامات پر ہمیشہ پہلے 1122 اور 115۔ حاضر تشخیص نہیں کرتا۔")}
     </div>`;
     const form = document.getElementById("askForm"), q = document.getElementById("q");
+    const submit = () => (form.requestSubmit ? form.requestSubmit() : form.onsubmit(new Event("submit")));
     form.onsubmit = (e) => { e.preventDefault(); if (q.value.trim()) location.hash = "#/ask?q=" + encodeURIComponent(q.value.trim()); };
-    $app.querySelectorAll("[data-ex]").forEach((b) => b.onclick = () => { q.value = b.dataset.ex; form.requestSubmit ? form.requestSubmit() : form.onsubmit(new Event("submit")); });
-    bindMic(document.getElementById("mic"), q, () => form.requestSubmit ? form.requestSubmit() : form.onsubmit(new Event("submit")));
+    $app.querySelectorAll("[data-ex]").forEach((b) => b.onclick = () => { q.value = b.dataset.ex; submit(); });
+    bindMic(document.getElementById("mic"), q, submit);
     bindLocation();
     try {
       const s = await api("/stats");
       const c = s.counters || {};
       const el = document.getElementById("liveStats");
       if (el) el.innerHTML = [
-        [s.freeBedsTotal, L_(`free beds in ${s.hospitals} hospitals`, "خالی بستر")],
-        [`${s.ambulancesAvailable}/${s.ambulancesTotal}`, L_("demo ambulances available", "ایمبولینس دستیاب")],
-        [s.machinesDown.length, L_("machines down right now", "مشینیں خراب")],
-        [c.estMinutesSaved || 0, L_("est. minutes saved for families", "منٹ بچائے گئے")],
+        [s.hospitals, L_(`real hospitals (${s.hospitals - s.privateHospitals} govt · ${s.privateHospitals} private)`, "اصل ہسپتال")],
+        [s.pharmacies, L_("real pharmacies mapped", "اصل فارمیسیاں")],
+        [`${s.hospitalsReporting}/${s.hospitals}`, L_("hospitals reporting live", "ہسپتال رپورٹ کر رہے ہیں")],
+        [c.searches || 0, L_("searches by families", "تلاشیں")],
       ].map(([b, t]) => `<div class="stat"><b>${esc(b)}</b><span>${t}</span></div>`).join("");
     } catch (e) { const el = document.getElementById("liveStats"); if (el) el.innerHTML = errBox(e); }
   }
@@ -283,18 +280,18 @@
       const d = await post("/ask", { text: q, lat: state.loc.lat, lon: state.loc.lon, lang: state.lang });
       const e = d.entities || {};
       const reason = (state.lang === "ur" && d.reasonUr) ? d.reasonUr : d.reasonEn;
+      const best = d.hospitals && d.hospitals[0];
       let html = "";
-      if (e.redFlag) html += redBanner(q, e.redFlagReason);
+      if (e.redFlag || d.intent === "ambulance") html += redBanner(e.redFlagReason, best);
       html += `<div class="note">🧠 ${esc(reason || "")} <span class="pill o">${d.understoodBy === "ai" ? L_("understood by AI", "AI نے سمجھا") : L_("keyword match", "الفاظ سے")}</span>
         ${e.department ? `<span class="pill x">${esc(dept(e.department))}</span>` : ""}${e.urgency && e.urgency !== "routine" ? `<span class="pill r">${esc(e.urgency)}</span>` : ""}
         <button class="btn sm" id="say" style="margin-inline-start:6px">🔊</button></div>`;
-      if (d.minutesSaved) html += `<div class="note">⏱️ ${L_("The nearest hospital can't help right now, so we sent you to the best option instead. That saves a wasted trip (about 25 minutes).", "قریبی ہسپتال ابھی مدد نہیں کر سکتا، اس لیے بہتر آپشن دکھایا۔")}</div>`;
-      if (d.intent === "ambulance") {
-        html += `<div class="card"><h3>🚑 ${L_("Ambulance", "ایمبولینس")}</h3><p class="small muted">${L_("For any emergency call Rescue 1122. You can also request the nearest vehicle from the demo ambulance network.", "کسی بھی ایمرجنسی میں 1122 کال کریں۔")}</p>
-          <div class="btns"><a class="btn d" href="tel:1122">📞 ${L_("Call Rescue 1122", "ریسکیو 1122")}</a><button class="btn p" data-amb="${esc(q)}">🚑 ${L_("Request ambulance (demo)", "ایمبولینس منگوائیں (ڈیمو)")}</button><a class="btn" href="#/ambulance">🗺️ ${L_("See ambulances near me", "قریبی ایمبولینس دیکھیں")}</a></div><div class="small nearestAmb" style="margin-top:8px"></div></div>`;
-      }
-      if (d.hospitals && d.hospitals.length) html += `<div class="chips"><a class="chip" href="#/hospitals?dept=${encodeURIComponent(e.department || "Emergency")}&sehat=1">Sehat Card</a><a class="chip" href="#/hospitals?dept=${encodeURIComponent(e.department || "Emergency")}&female=1">♀ ${L_("Female doctor", "لیڈی ڈاکٹر")}</a></div>`;
-      if (d.hospitals) html += d.hospitals.length ? d.hospitals.map((h, i) => hospitalCard(h, i, { redFlag: e.redFlag, condition: q })).join("") : `<div class="empty">${L_("No matching hospital found.", "کوئی ہسپتال نہیں ملا۔")}</div>`;
+      if (d.minutesSaved) html += `<div class="note">⏱️ ${L_("The nearest hospital's staff report no free beds, so a better option is shown first. That can save a wasted trip.", "قریبی ہسپتال نے بستر نہ ہونے کی رپورٹ دی ہے، اس لیے بہتر آپشن پہلے دکھایا۔")}</div>`;
+      if (d.hospitals && d.hospitals.length) {
+        if (!d.hospitals.some((h) => h.hasReports)) html += `<div class="note warn small">ℹ️ ${L_("None of these hospitals have reported live availability yet, so they are sorted by distance and department. Call ahead or go to the nearest emergency.", "ان ہسپتالوں نے ابھی دستیابی رپورٹ نہیں کی، اس لیے فاصلے کے مطابق ترتیب دی گئی ہے۔")}</div>`;
+        html += `<div class="chips"><a class="chip" href="#/hospitals?dept=${encodeURIComponent(e.department || "Emergency")}&type=government">🏛️ ${L_("Government only", "صرف سرکاری")}</a><a class="chip" href="#/hospitals?dept=${encodeURIComponent(e.department || "Emergency")}&type=private">💳 ${L_("Private only", "صرف پرائیویٹ")}</a><a class="chip" href="#/hospitals?dept=${encodeURIComponent(e.department || "Emergency")}&female=1">♀ ${L_("Female doctor", "لیڈی ڈاکٹر")}</a></div>`;
+        html += d.hospitals.map((h, i) => hospitalCard(h, i)).join("");
+      } else if (d.hospitals) html += `<div class="empty">${L_("No matching hospital found.", "کوئی ہسپتال نہیں ملا۔")}</div>`;
       res.innerHTML = html + (d.medicine ? '<div id="medRes"></div>' : "") + (d.blood ? '<div id="bloodRes"></div>' : "") + (d.equipment ? '<div id="eqRes"></div>' : "");
       if (d.medicine) renderMedicine(document.getElementById("medRes"), d.medicine);
       if (d.blood) renderBlood(document.getElementById("bloodRes"), d.blood);
@@ -305,22 +302,24 @@
   }
 
   async function hospitalsPage(params) {
-    const sel = { dept: params.get("dept") || "Emergency", female: params.get("female") === "1", sehat: params.get("sehat") === "1", type: params.get("type") || "" };
-    $app.innerHTML = `<h1>🛏️ ${L_("Hospital beds right now", "اس وقت ہسپتال بستر")}</h1>${locationRow(true)}
-      <div class="chips" id="deptChips">${DEPTS.map((d) => `<button class="chip ${d === sel.dept ? "on" : ""}" data-d="${d}">${esc(dept(d))}</button>`).join("")}</div>
-      <div class="chips">${[["", L_("All hospitals", "تمام")], ["government", "🏛️ " + L_("Government (free)", "سرکاری (مفت)")], ["private", "💳 " + L_("Private (fees)", "پرائیویٹ (فیس)")]].map(([v, l]) => `<button class="chip ${sel.type === v ? "on" : ""}" data-own="${v}">${l}</button>`).join("")}</div>
-      <div class="chips"><button class="chip ${sel.sehat ? "on" : ""}" id="fSehat">Sehat Card</button><button class="chip ${sel.female ? "on" : ""}" id="fFem">♀ ${L_("Female doctor", "لیڈی ڈاکٹر")}</button></div>
+    const sel = { dept: params.get("dept") || "Emergency", female: params.get("female") === "1", type: params.get("type") || "" };
+    $app.innerHTML = `<h1>🛏️ ${L_("Hospitals near you", "آپ کے قریب ہسپتال")}</h1>${locationRow(true)}
+      <div class="chips">${DEPTS.map((d) => `<button class="chip ${d === sel.dept ? "on" : ""}" data-d="${d}">${esc(dept(d))}</button>`).join("")}</div>
+      <div class="chips">${[["", L_("All hospitals", "تمام")], ["government", "🏛️ " + L_("Government (free)", "سرکاری (مفت)")], ["private", "💳 " + L_("Private (fees)", "پرائیویٹ (فیس)")]].map(([v, l]) => `<button class="chip ${sel.type === v ? "on" : ""}" data-own="${v}">${l}</button>`).join("")}
+        <button class="chip ${sel.female ? "on" : ""}" id="fFem">♀ ${L_("Female doctor reported", "لیڈی ڈاکٹر")}</button></div>
       <div id="res">${skeleton(3)}</div>`;
-    const go = () => { location.hash = `#/hospitals?dept=${encodeURIComponent(sel.dept)}${sel.female ? "&female=1" : ""}${sel.sehat ? "&sehat=1" : ""}${sel.type ? "&type=" + sel.type : ""}`; };
-    $app.querySelectorAll("[data-own]").forEach((b) => b.onclick = () => { sel.type = b.dataset.own; go(); });
+    const go = () => { location.hash = `#/hospitals?dept=${encodeURIComponent(sel.dept)}${sel.female ? "&female=1" : ""}${sel.type ? "&type=" + sel.type : ""}`; };
     $app.querySelectorAll("[data-d]").forEach((b) => b.onclick = () => { sel.dept = b.dataset.d; go(); });
-    document.getElementById("fSehat").onclick = () => { sel.sehat = !sel.sehat; go(); };
+    $app.querySelectorAll("[data-own]").forEach((b) => b.onclick = () => { sel.type = b.dataset.own; go(); });
     document.getElementById("fFem").onclick = () => { sel.female = !sel.female; go(); };
     bindLocation(() => hospitalsPage(params));
     const res = document.getElementById("res");
     try {
-      const d = await api(`/hospitals?${locQ()}&dept=${encodeURIComponent(sel.dept)}${sel.female ? "&female=1" : ""}${sel.sehat ? "&sehat=1" : ""}${sel.type ? "&type=" + sel.type : ""}`);
-      res.innerHTML = d.hospitals.length ? d.hospitals.map((h, i) => hospitalCard(h, i)).join("") : `<div class="empty">${L_("No hospital matches these filters.", "ان فلٹرز کے ساتھ کوئی ہسپتال نہیں۔")}</div>`;
+      const d = await api(`/hospitals?${locQ()}&dept=${encodeURIComponent(sel.dept)}${sel.female ? "&female=1" : ""}${sel.type ? "&type=" + sel.type : ""}`);
+      let list = d.hospitals;
+      if (sel.female) list = list.filter((h) => h.femaleDoctor);
+      res.innerHTML = list.length ? list.map((h, i) => hospitalCard(h, i)).join("")
+        : `<div class="empty">${sel.female ? L_("No hospital has reported a female doctor on duty in this department yet.", "ابھی کسی ہسپتال نے لیڈی ڈاکٹر کی رپورٹ نہیں دی۔") : L_("No hospital matches these filters.", "کوئی ہسپتال نہیں ملا۔")}</div>`;
       bindActions(res);
     } catch (e) { res.innerHTML = errBox(e); }
   }
@@ -329,127 +328,53 @@
     $app.innerHTML = skeleton(4);
     try {
       const f = await api(`/facility/${encodeURIComponent(id)}?${locQ()}`);
+      const approx = f.locationPrecision === "area" ? ` <span class="pill a">${L_("approximate location", "اندازاً مقام")}</span>` : "";
       let html = `<a href="javascript:history.back()" class="small">← ${L_("Back", "واپس")}</a><h1>${esc(state.lang === "ur" && f.nameUr ? f.nameUr : f.name)}</h1>
-        <div class="muted">${f.distanceKm} km ${f.etaMin ? "· ~" + f.etaMin + " min" : ""} ${f.type === "hospital" ? ownPill(f.ownership) : ""} ${f.erLoad ? loadPill(f.erLoad) : ""} <span class="pill x">${L_("simulated data", "فرضی ڈیٹا")}</span></div>
-        <div class="btns"><a class="btn p" target="_blank" rel="noopener" href="${dirUrl(f.lat, f.lon)}">🧭 ${L_("Directions", "راستہ")}</a>${f.type === "hospital" ? `<button class="btn" data-notify="${f.id}" data-dept="Emergency" data-name="${esc(f.name)}" data-eta="${f.etaMin}">🔔 ${L_("Notify hospital", "اطلاع دیں")}</button>` : ""}</div>`;
-      if (f.beds && Object.keys(f.beds).length) {
-        html += `<h2>${L_("Beds by department", "شعبہ وار بستر")}</h2><div class="card"><table class="t"><tr><th>${L_("Department", "شعبہ")}</th><th>${L_("Free", "خالی")}</th><th>${L_("Total", "کل")}</th><th>${L_("Updated", "اپ ڈیٹ")}</th></tr>` +
-          Object.entries(f.beds).map(([k, b]) => `<tr class="${b.stale ? "stale" : ""}"><td>${esc(dept(k))}</td><td><span class="pill ${bedClass(b.free, b.total)}">${b.free}</span></td><td>${b.total}</td><td class="small muted">${ago(b.updatedAt)}${staleNote(b.updatedAt)}</td></tr>`).join("") + "</table></div>";
+        <div class="pills">${f.type === "hospital" ? ownPill(f.ownership) : ""}${loadPill(f.erLoad || "Unknown")}${approx}<span class="pill x">${f.distanceKm} km${f.etaMin ? " · ~" + f.etaMin + " min" : ""}</span></div>
+        <div class="small muted">${L_("Name and location source:", "نام اور مقام کا ذریعہ:")} ${esc(f.source || "")}</div>
+        <div class="btns"><a class="btn p" target="_blank" rel="noopener" href="${dirUrl(f.lat, f.lon)}">🧭 ${L_("Directions", "راستہ")}</a>${f.type === "hospital" ? `<button class="btn" data-notify="${f.id}" data-dept="Emergency" data-name="${esc(f.name)}" data-eta="${f.etaMin}">🔔 ${L_("Tell hospital you're coming", "اطلاع دیں")}</button>` : ""}</div>`;
+      if (f.type === "hospital") {
+        html += `<h2>${L_("Beds by department", "شعبہ وار بستر")}</h2><div class="card"><table class="t"><tr><th>${L_("Department", "شعبہ")}</th><th>${L_("Free beds", "خالی بستر")}</th><th>${L_("Reported", "رپورٹ")}</th></tr>` +
+          (f.departments || []).map((k) => { const b = f.beds[k]; return `<tr class="${b && b.stale ? "stale" : ""}"><td>${esc(dept(k))}</td><td>${b ? `<span class="pill ${bedClass(b.free)}">${b.free}</span>` : `<span class="pill x">${NR()}</span>`}</td><td class="small muted">${b ? ago(b.updatedAt) + staleNote(b.updatedAt) : ""}</td></tr>`; }).join("") + "</table></div>";
+        html += `<h2>${L_("Doctors reported on duty", "ڈیوٹی پر ڈاکٹر (رپورٹ)")}</h2><div class="card">` + (f.doctors.length ? `<table class="t">` + f.doctors.map((d) => `<tr><td>${esc(d.name)} ${d.gender === "F" ? "♀" : ""}</td><td>${esc(dept(d.dept || ""))}</td><td>${d.onDuty ? `<span class="pill g">${L_("on duty", "ڈیوٹی پر")}${d.shiftEnds ? " → " + d.shiftEnds : ""}</span>` : `<span class="pill x">${L_("off", "آف")}</span>`}</td><td class="small muted">${ago(d.updatedAt)}</td></tr>`).join("") + "</table>" : `<div class="muted small">${NR()}</div>`) + "</div>";
+        html += `<h2>${L_("Machines", "مشینیں")}</h2><div class="card pills">` + EQUIP.map((k) => eqPill(k, f.equipment[k])).join(" ") + "</div>";
       }
-      if (f.doctors && f.doctors.length) {
-        html += `<h2>${L_("Doctors", "ڈاکٹر")} <span class="pill x">${L_("fictional names · pilot", "فرضی نام · پائلٹ")}</span></h2><div class="card"><table class="t">` + f.doctors.map((d) => `<tr><td>${esc(d.name)} ${d.gender === "F" ? "♀" : ""}</td><td>${esc(dept(d.dept))}</td><td>${d.onDuty ? `<span class="pill g">${L_("on duty", "ڈیوٹی پر")}${d.shiftEnds ? " → " + d.shiftEnds : ""}</span>` : `<span class="pill x">${L_("off", "چھٹی")}</span>`}</td></tr>`).join("") + "</table></div>";
+      if (f.type === "pharmacy") {
+        html += `<h2>${L_("Medicine stock reported", "رپورٹ شدہ دوائیں")}</h2><div class="card">` + (f.medicine.length ? `<table class="t">` + f.medicine.map((m) => `<tr class="${nowS() - m.updatedAt > 7200 ? "stale" : ""}"><td>${esc(m.name)}</td><td>${m.qty > 0 ? `<span class="pill g">${m.qty}</span>` : `<span class="pill r">${L_("out", "ختم")}</span>`}</td><td>${m.priceRs ? "Rs " + m.priceRs : ""}</td><td class="small muted">${ago(m.updatedAt)}</td></tr>`).join("") + "</table>" : `<div class="muted small">${L_("This pharmacy hasn't reported stock yet.", "اس فارمیسی نے ابھی اسٹاک رپورٹ نہیں کیا۔")}</div>`) + "</div>";
       }
-      if (f.equipment && Object.keys(f.equipment).length) {
-        html += `<h2>${L_("Machines", "مشینیں")}</h2><div class="card pills">` + Object.entries(f.equipment).map(([k, e]) => eqPill(k, e) + (e.queue ? `<span class="small muted">(${L_("queue", "قطار")} ${e.queue})</span>` : "")).join(" ") + "</div>";
+      if (f.type === "bloodbank") {
+        html += `<h2>${L_("Blood units reported", "رپورٹ شدہ خون")}</h2><div class="card pills">` + GROUPS.map((g) => { const b = f.blood[g]; return b ? `<span class="pill ${b.units === 0 ? "r" : b.units < 3 ? "a" : "g"}">${g}: ${b.units}</span>` : `<span class="pill x">${g}: ${NR()}</span>`; }).join("") + "</div>";
       }
-      if (f.medicine && f.medicine.length) {
-        html += `<h2>${f.type === "hospital" ? L_("Free dispensary stock", "مفت ڈسپنسری") : L_("Medicine stock", "دوا اسٹاک")}</h2><div class="card"><table class="t">` + f.medicine.map((m) => `<tr class="${nowS() - m.updatedAt > 7200 ? "stale" : ""}"><td>${esc(m.name)}<div class="small muted">${esc(m.salt)} ${esc(m.strength)}</div></td><td>${m.inStock ? `<span class="pill g">${m.qty}</span>` : `<span class="pill r">${L_("out", "ختم")}</span>`}</td><td>${m.priceRs ? "Rs " + m.priceRs : L_("free", "مفت")}</td></tr>`).join("") + "</table></div>";
-      }
-      if (f.blood && Object.keys(f.blood).length) {
-        html += `<h2>${L_("Blood units", "خون کی بوتلیں")}</h2><div class="card pills">` + Object.entries(f.blood).map(([g, b]) => `<span class="pill ${b.units === 0 ? "r" : b.units < 3 ? "a" : "g"}">${g}: ${b.units}</span>`).join("") + "</div>";
-      }
-      html += `<h2>${L_("Recent updates", "حالیہ اپ ڈیٹس")}</h2><div class="card small">` + (f.recentUpdates || []).map((u) => `<div>${esc(u.what)} · <span class="muted">${esc(u.by || "")}, ${ago(u.at)}</span></div>`).join("") + "</div>";
+      if (f.recentUpdates && f.recentUpdates.length) html += `<h2>${L_("Recent reports", "حالیہ رپورٹس")}</h2><div class="card small">` + f.recentUpdates.map((u) => `<div>${esc(u.what)} · <span class="muted">${esc(u.by || "")}, ${ago(u.at)}</span></div>`).join("") + "</div>";
       $app.innerHTML = html;
       bindActions($app);
     } catch (e) { $app.innerHTML = errBox(e); }
   }
 
-  // ---- ambulance
-  const ambType = (t) => (t === "ALS" ? L_("Advanced life support", "ایڈوانس لائف سپورٹ") : L_("Basic", "بیسک"));
-  const ambStatus = (s) => (s === "available" ? `<span class="pill g">${L_("free", "فارغ")}</span>` : `<span class="pill a">${L_("on a call", "مصروف")}</span>`);
-
-  // one-line "nearest ambulance" summary, filled in async (used in the emergency banner)
-  async function fillNearestAmbulance(el) {
-    if (!el) return;
-    try {
-      const d = await api(`/ambulances?${locQ()}`);
-      const n = d.nearestALS && d.nearestALS.etaMin <= (d.nearest ? d.nearest.etaMin + 5 : 99) ? d.nearestALS : d.nearest;
-      el.innerHTML = n ? `🚑 ${L_("Nearest demo ambulance", "قریب ترین ڈیمو ایمبولینس")}: <b>${esc(n.id)}</b> (${ambType(n.type)}) · ${n.distanceKm} km · ~${n.etaMin} min · ${d.available}/${d.total} ${L_("free", "فارغ")}` : L_("No demo ambulance free right now. Call 1122.", "کوئی ڈیمو ایمبولینس فارغ نہیں، 1122 کال کریں۔");
-    } catch (e) { el.textContent = ""; }
-  }
-
+  // ---- ambulance: real helplines + alert the hospital
   async function ambulancePage() {
     $app.innerHTML = `<h1>🚑 ${L_("Ambulance", "ایمبولینس")}</h1>
-      <div class="alert-red"><h2>📞 ${L_("Real emergency? Call Rescue 1122.", "اصل ایمرجنسی؟ 1122 کال کریں۔")}</h2><div class="btns"><a class="btn w" href="tel:1122">${L_("Call Rescue 1122", "ریسکیو 1122 کال کریں")}</a></div></div>
-      <div class="card"><h3>${L_("Demo ambulance network", "ڈیمو ایمبولینس نیٹ ورک")} <span class="pill x">${L_("simulated", "فرضی")}</span></h3>
-      <p class="small muted">${L_("Picks the nearest free vehicle (advanced life support for danger signs), chooses the best hospital and alerts it before you arrive.", "قریبی ایمبولینس، بہترین ہسپتال، اور پیشگی اطلاع۔")}</p>
-      <textarea id="cond" maxlength="300" placeholder="${L_("What happened? e.g. abbu behosh ho gaye, saans nahi aa rahi", "کیا ہوا؟")}"></textarea>
-      ${locationRow(true)}
-      <div class="btns"><button class="btn p" id="reqBtn">🚑 ${L_("Request ambulance (demo)", "ایمبولینس منگوائیں (ڈیمو)")}</button></div></div>
-      <h2>${L_("Ambulances near you", "آپ کے قریب ایمبولینس")} <span class="pill x">${L_("live · simulated", "لائیو · فرضی")}</span></h2>
-      <div class="legend"><span>📍 ${L_("you", "آپ")}</span><span>🚑 ${L_("free", "فارغ")}</span><span>🚨 ${L_("on a call", "مصروف")}</span></div>
-      <div class="map" id="ambNear"></div><div id="ambList">${skeleton(2)}</div>`;
+      <div class="alert-red"><h2>📞 ${L_("Call an ambulance service", "ایمبولینس سروس کو کال کریں")}</h2>
+        <div class="btns">${helplineBtns(true)}</div>
+        <div class="small" style="margin-top:8px;opacity:.9">${L_("Haazir does not dispatch ambulances. These are the real public helplines.", "حاضر ایمبولینس نہیں بھیجتا۔ یہ اصل ہیلپ لائنز ہیں۔")}</div></div>
+      <div class="card"><h3>🔔 ${L_("Then tell the hospital you're coming", "پھر ہسپتال کو بتائیں کہ آپ آ رہے ہیں")}</h3>
+        <p class="small muted">${L_("Nearest hospitals with an emergency department. Tap 'Tell hospital' so the emergency team sees you coming in its staff portal.", "قریب ترین ایمرجنسی والے ہسپتال۔")}</p>${locationRow(true)}</div>
+      <div id="res">${skeleton(2)}</div>`;
     bindLocation(() => ambulancePage());
-    const b = document.getElementById("reqBtn");
-    b.onclick = () => requestAmbulance(document.getElementById("cond").value.trim() || "Emergency", null, b);
-    const m = makeMap(document.getElementById("ambNear"), [state.loc.lat, state.loc.lon], 13);
-    const layer = m ? window.L.layerGroup().addTo(m) : null;
-    youMarker(m);
-    let fitted = false;
-    async function load() {
-      try {
-        const d = await api(`/ambulances?${locQ()}`);
-        const list = document.getElementById("ambList");
-        if (!list) return;
-        if (layer) {
-          layer.clearLayers();
-          d.ambulances.forEach((a) => window.L.marker([a.lat, a.lon], { icon: dotIcon(a.status === "available" ? "🚑" : "🚨") }).addTo(layer)
-            .bindPopup(`<b>${esc(a.id)}</b> · ${ambType(a.type)}<br>${a.distanceKm} km · ~${a.etaMin} min`));
-          if (!fitted) {
-            m.invalidateSize();
-            const near = d.ambulances.filter((a) => a.status === "available").slice(0, 4);
-            m.fitBounds([[state.loc.lat, state.loc.lon], ...near.map((a) => [a.lat, a.lon])], { padding: [30, 30], maxZoom: 14 });
-            fitted = true;
-          }
-        }
-        list.innerHTML = `<div class="small muted" style="margin:6px 0">${d.available} ${L_("of", "میں سے")} ${d.total} ${L_("demo ambulances free right now. Positions refresh every 10 seconds.", "ڈیمو ایمبولینس اس وقت فارغ ہیں۔")}</div>` +
-          d.ambulances.slice(0, 6).map((a, i) => `<div class="card ${i === 0 && a.status === "available" ? "top1" : ""}"><div class="row"><div class="big ${a.status === "available" ? "g" : "a"}" style="font-size:26px">${a.etaMin}<small>${L_("min away", "منٹ دور")}</small></div>
-            <div class="grow"><h3>🚑 ${esc(a.id)} · ${ambType(a.type)}</h3><div class="small muted">${a.distanceKm} km · ${L_("updated", "اپ ڈیٹ")} ${ago(a.updatedAt)}</div><div class="pills">${ambStatus(a.status)}</div></div></div></div>`).join("");
-      } catch (e) { const list = document.getElementById("ambList"); if (list) list.innerHTML = errBox(e); }
-    }
-    await load();
-    every(load, 10000);
-  }
-
-  async function ambulanceTrack(rid) {
-    $app.innerHTML = `<h1>🚑 ${L_("Ambulance on the way", "ایمبولینس راستے میں")} <span class="pill x">${L_("demo", "ڈیمو")}</span></h1>
-      <div class="row" style="flex-wrap:wrap"><div class="grow"><div class="muted small">${L_("Arriving in", "پہنچنے میں")}</div><div class="countdown" id="cd">…</div><div id="ambInfo" class="small"></div></div>
-      <a class="btn d" href="tel:1122">📞 ${L_("Call Rescue 1122", "ریسکیو 1122")}</a></div>
-      <div class="map tall" id="ambMap"></div><div class="grid2"><div class="card"><h3>${L_("Status", "صورتحال")}</h3><ul class="timeline" id="tl"></ul></div><div class="card" id="hospBox"></div></div>`;
-    let m = null, ambM = null, first = true;
-    const labels = { assigned: L_("Ambulance assigned", "ایمبولینس مقرر"), en_route: L_("On the way to you", "آپ کی طرف روانہ"), arrived: L_("Arrived at patient", "مریض تک پہنچ گئی"), to_hospital: L_("Heading to hospital", "ہسپتال کی طرف"), at_hospital: L_("Reached hospital", "ہسپتال پہنچ گئی") };
-    async function tick() {
-      try {
-        const s = await api(`/ambulance/request/${rid}`);
-        if (first) {
-          first = false;
-          m = makeMap(document.getElementById("ambMap"), [s.patient.lat, s.patient.lon], 13);
-          if (m) {
-            window.L.marker([s.patient.lat, s.patient.lon], { icon: dotIcon("📍") }).addTo(m).bindPopup(L_("Patient", "مریض"));
-            window.L.marker([s.destination.lat, s.destination.lon], { icon: dotIcon("🏥") }).addTo(m).bindPopup(esc(s.destination.name));
-            ambM = window.L.marker([s.lat, s.lon], { icon: dotIcon("🚑") }).addTo(m);
-            m.fitBounds([[s.patient.lat, s.patient.lon], [s.destination.lat, s.destination.lon], [s.lat, s.lon]], { padding: [40, 40] });
-          }
-          document.getElementById("ambInfo").innerHTML = `${esc(s.ambulance.id)} · ${s.ambulance.type === "ALS" ? L_("Advanced life support", "ایڈوانس لائف سپورٹ") : L_("Basic ambulance", "بیسک ایمبولینس")} · ${L_("real-world estimate", "اصل اندازہ")} ~${s.realEtaMin} min`;
-          document.getElementById("hospBox").innerHTML = `<h3>🏥 ${esc(s.destination.name)}</h3><div class="note">✅ ${L_("Hospital has been alerted before arrival.", "ہسپتال کو پیشگی اطلاع دے دی گئی ہے۔")}</div><div class="small muted">${L_("Message sent to the emergency desk:", "ایمرجنسی ڈیسک کو پیغام:")}</div><div class="small">“${esc(s.summary)}”</div><div class="btns"><a class="btn sm" href="#/facility/${s.destination.id}">${L_("Hospital details", "ہسپتال کی تفصیل")}</a></div>`;
-        }
-        if (ambM) ambM.setLatLng([s.lat, s.lon]);
-        const cd = document.getElementById("cd");
-        if (cd) cd.textContent = s.status === "at_hospital" ? L_("At hospital", "ہسپتال میں") : s.status === "arrived" ? L_("Arrived", "پہنچ گئی") : `${Math.floor(s.etaSec / 60)}:${String(s.etaSec % 60).padStart(2, "0")}`;
-        const done = new Set(s.timeline.map((x) => x.status));
-        const tl = document.getElementById("tl");
-        if (tl) tl.innerHTML = Object.keys(labels).map((k) => `<li class="${done.has(k) ? "done" : ""}">${labels[k]}</li>`).join("");
-      } catch (e) { const cd = document.getElementById("cd"); if (cd) cd.textContent = "!"; }
-    }
-    await tick();
-    every(tick, 2000);
+    const res = document.getElementById("res");
+    try {
+      const d = await api(`/hospitals?${locQ()}&dept=Emergency`);
+      res.innerHTML = d.hospitals.slice(0, 5).map((h, i) => hospitalCard(h, i)).join("");
+      res.querySelectorAll("[data-notify]").forEach((b) => { b.dataset.amb = "1"; });
+      bindActions(res);
+    } catch (e) { res.innerHTML = errBox(e); }
   }
 
   // ---- medicine
   function medicinePage(params) {
     $app.innerHTML = `<h1>💊 ${L_("Find a medicine", "دوا تلاش کریں")}</h1>${locationRow(true)}
       <form class="field" id="mf"><input id="mq" maxlength="80" placeholder="${L_("Medicine name, e.g. Augmentin 625", "دوا کا نام")}" value="${esc(params.get("q") || "")}"><button class="btn p">${L_("Search", "تلاش")}</button></form>
-      <div class="card"><h3>📷 ${L_("Scan a prescription", "نسخہ اسکین کریں")}</h3><p class="small muted">${L_("Take a photo. AI reads the medicine names, you confirm them, and we find one pharmacy that has everything.", "تصویر لیں؛ AI نام پڑھے گا، آپ تصدیق کریں، ہم ایک فارمیسی ڈھونڈیں گے جہاں سب کچھ ہو۔")}</p>
+      <div class="card"><h3>📷 ${L_("Scan a prescription", "نسخہ اسکین کریں")}</h3><p class="small muted">${L_("Take a photo. AI reads the medicine names, you confirm them, and Haazir looks for one pharmacy that has reported having everything.", "تصویر لیں؛ AI نام پڑھے گا، آپ تصدیق کریں۔")}</p>
       <input type="file" id="rx" accept="image/*" capture="environment"> <button class="btn sm" id="rxManual">${L_("or type the list", "یا فہرست لکھیں")}</button><div id="rxOut"></div></div>
       <div id="res"></div>`;
     bindLocation();
@@ -496,7 +421,7 @@
   function rxConfirm(meds, keepMsg) {
     const out = document.getElementById("rxOut");
     const rowH = (m) => `<div class="field rxrow"><input value="${esc(m.name || "")}" placeholder="${L_("Medicine name", "دوا کا نام")}">${m.confidence ? `<span class="pill ${m.confidence === "high" ? "g" : m.confidence === "low" ? "r" : "a"}" style="align-self:center">${esc(m.confidence)}</span>` : ""}</div>`;
-    out.innerHTML = (keepMsg ? out.innerHTML : "") + `<div class="note">✏️ ${L_("Check the list. Edit anything the AI got wrong.", "فہرست چیک کریں اور غلطی درست کریں۔")}</div><div id="rxRows">${meds.map(rowH).join("")}</div>
+    out.innerHTML = (keepMsg ? out.innerHTML : "") + `<div class="note">✏️ ${L_("Check the list. Edit anything that's wrong.", "فہرست چیک کریں اور غلطی درست کریں۔")}</div><div id="rxRows">${meds.map(rowH).join("")}</div>
       <div class="btns"><button class="btn sm" id="rxAdd">+ ${L_("Add medicine", "دوا شامل کریں")}</button><button class="btn p" id="rxGo">${L_("Find a pharmacy with everything", "سب کچھ ایک جگہ تلاش کریں")}</button></div><div id="planOut"></div>`;
     document.getElementById("rxAdd").onclick = () => document.getElementById("rxRows").insertAdjacentHTML("beforeend", rowH({ name: "" }));
     document.getElementById("rxGo").onclick = async () => {
@@ -510,12 +435,12 @@
 
   function renderPlan(el, p) {
     let html = "";
-    if (p.onePharmacy) html += `<div class="note">✅ <b>${L_("One pharmacy has everything:", "ایک فارمیسی میں سب کچھ:")}</b> ${esc(p.stops[0].name)} (${p.stops[0].distanceKm} km)</div>`;
-    else if (p.stops.length) html += `<div class="note warn">${L_(`No single pharmacy has everything. Fewest stops: ${p.stops.length}`, `کسی ایک فارمیسی میں سب کچھ نہیں؛ ${p.stops.length} جگہیں`)}</div>`;
-    else html += `<div class="note warn">${L_("None of these medicines were found in stock nearby.", "یہ دوائیں قریب دستیاب نہیں۔")}</div>`;
-    html += p.stops.map((s) => `<div class="card"><h3>🏪 ${esc(s.name)}</h3><div class="small muted">${s.distanceKm} km · ~${s.etaMin} min</div><table class="t">${Object.values(s.have).map((h) => `<tr><td>${esc(h.name)} ${h.substitute ? `<span class="pill a">${L_("same-salt substitute", "متبادل")}</span>` : ""}</td><td>Rs ${h.priceRs}</td></tr>`).join("")}</table><div class="btns"><a class="btn p sm" target="_blank" rel="noopener" href="${dirUrl(s.lat, s.lon)}">🧭 ${L_("Directions", "راستہ")}</a></div></div>`).join("");
-    if (p.missing.length) html += `<div class="note warn">${L_("Not found:", "نہیں ملی:")} ${p.missing.map((m) => esc(m.asked)).join(", ")}</div>`;
-    if (p.stops.length) html += `<div class="card"><b>${L_("Estimated total", "کل اندازاً")}: Rs ${p.totalRs}</b> <span class="small muted">(${L_("simulated prices", "فرضی قیمتیں")})</span></div>`;
+    if (p.onePharmacy) html += `<div class="note">✅ <b>${L_("One pharmacy has reported having everything:", "ایک فارمیسی میں سب کچھ:")}</b> ${esc(p.stops[0].name)} (${p.stops[0].distanceKm} km)</div>`;
+    else if (p.stops.length) html += `<div class="note warn">${L_(`No single pharmacy has reported everything. Fewest stops: ${p.stops.length}`, `کسی ایک فارمیسی میں سب کچھ نہیں؛ ${p.stops.length} جگہیں`)}</div>`;
+    else html += `<div class="note warn">${L_("No pharmacy has reported stock of these medicines yet. Try the nearest pharmacies or ask your hospital dispensary.", "ابھی کسی فارمیسی نے یہ دوائیں رپورٹ نہیں کیں۔")}</div>`;
+    html += p.stops.map((s) => `<div class="card"><h3>🏪 ${esc(s.name)}</h3><div class="small muted">${s.distanceKm} km · ~${s.etaMin} min</div><table class="t">${Object.values(s.have).map((h) => `<tr><td>${esc(h.name)} ${h.substitute ? `<span class="pill a">${L_("same-salt substitute", "متبادل")}</span>` : ""}</td><td>${h.priceRs ? "Rs " + h.priceRs : ""}</td></tr>`).join("")}</table><div class="btns"><a class="btn p sm" target="_blank" rel="noopener" href="${dirUrl(s.lat, s.lon)}">🧭 ${L_("Directions", "راستہ")}</a></div></div>`).join("");
+    if (p.missing.length && p.stops.length) html += `<div class="note warn">${L_("Not found:", "نہیں ملی:")} ${p.missing.map((m) => esc(m.asked)).join(", ")}</div>`;
+    if (p.totalRs) html += `<div class="card"><b>${L_("Total (reported prices)", "کل (رپورٹ شدہ قیمت)")}: Rs ${p.totalRs}</b></div>`;
     html += `<div class="note warn small">⚠️ ${L_("Confirm with your doctor or pharmacist before switching.", "تبدیل کرنے سے پہلے ڈاکٹر یا فارماسسٹ سے تصدیق کریں۔")}</div>`;
     el.innerHTML = html;
   }
@@ -524,18 +449,22 @@
     if (!d.matched || !d.matched.length) { el.innerHTML = `<div class="empty">${L_("We couldn't match that medicine name. Try the brand name printed on the box.", "دوا کا نام نہیں ملا۔ ڈبے پر لکھا نام آزمائیں۔")}</div>`; return; }
     const m = d.matched[0];
     let html = `<div class="card"><h3>💊 ${esc(m.name)}</h3><div class="small muted">${L_("Active ingredient", "جزو")}: ${esc(m.salt)} ${esc(m.strength)}</div>`;
-    if (d.alternatives.length) html += `<div class="small" style="margin-top:8px"><b>${L_("Cheaper same-salt alternatives", "اسی جزو کی سستی متبادل")}:</b> ${d.alternatives.map((a) => `${esc(a.name)} (~Rs ${a.priceRs})`).join(" · ")}</div><div class="small" style="color:var(--warn)">⚠️ ${L_("Confirm with your doctor or pharmacist before switching.", "تبدیل کرنے سے پہلے ڈاکٹر یا فارماسسٹ سے تصدیق کریں۔")}</div>`;
+    if (d.alternatives.length) html += `<div class="small" style="margin-top:8px"><b>${L_("Same active ingredient and strength", "اسی جزو اور طاقت کی دوائیں")}:</b> ${d.alternatives.map((a) => esc(a.name)).join(" · ")}</div><div class="small muted">${L_("Generic versions are usually cheaper.", "جنرک عموماً سستی ہوتی ہے۔")}</div><div class="small" style="color:var(--warn)">⚠️ ${L_("Confirm with your doctor or pharmacist before switching.", "تبدیل کرنے سے پہلے ڈاکٹر یا فارماسسٹ سے تصدیق کریں۔")}</div>`;
     html += `</div><div class="map" id="medMap"></div>`;
-    if (d.dispensaries.length) html += `<h2>🏥 ${L_("Free at hospital dispensaries", "ہسپتال ڈسپنسری میں مفت")}</h2>` + d.dispensaries.map(stockCard).join("");
-    html += `<h2>🏪 ${L_("Pharmacies with stock", "فارمیسیاں جہاں دستیاب ہے")}</h2>` + (d.pharmacies.length ? d.pharmacies.map(stockCard).join("") : `<div class="empty">${L_("Out of stock everywhere nearby.", "قریب کہیں دستیاب نہیں۔")}</div>`);
+    if (d.pharmacies.length) html += `<h2>🏪 ${L_("Pharmacies that reported stock", "جن فارمیسیوں نے اسٹاک رپورٹ کیا")}</h2>` + d.pharmacies.map(stockCard).join("");
+    else html += `<div class="note warn">ℹ️ ${L_(`No pharmacy has reported stock of this medicine yet (${d.reportingPharmacies} pharmacies reporting so far). Nearest real pharmacies:`, "ابھی کسی فارمیسی نے یہ دوا رپورٹ نہیں کی۔ قریب ترین فارمیسیاں:")}</div>` +
+      (d.nearbyPharmacies || []).map((p) => `<div class="card"><div class="row"><div class="grow"><h3>${esc(p.name)}</h3><div class="small muted">${p.distanceKm} km · ${L_("stock not reported", "اسٹاک رپورٹ نہیں")}</div></div><a class="btn p sm" target="_blank" rel="noopener" href="${dirUrl(p.lat, p.lon)}">🧭 ${L_("Directions", "راستہ")}</a></div></div>`).join("");
     el.innerHTML = html;
-    const mp = makeMap(document.getElementById("medMap"), [state.loc.lat, state.loc.lon], 12);
-    if (mp) { youMarker(mp); [...d.pharmacies, ...d.dispensaries].forEach((p) => window.L.circleMarker([p.lat, p.lon], { radius: 8, color: p.hasExact ? "#138a4a" : "#b26a00", fillOpacity: .8 }).addTo(mp).bindPopup(esc(p.name))); }
+    const mp = makeMap(document.getElementById("medMap"), [state.loc.lat, state.loc.lon], 13);
+    if (mp) {
+      youMarker(mp);
+      (d.pharmacies.length ? d.pharmacies : d.nearbyPharmacies || []).forEach((p) => window.L.circleMarker([p.lat, p.lon], { radius: 8, color: p.hasExact ? "#138a4a" : p.stock ? "#b26a00" : "#8a96a0", fillOpacity: .8 }).addTo(mp).bindPopup(esc(p.name)));
+    }
   }
   function stockCard(p) {
-    return `<div class="card"><div class="row"><div class="grow"><h3>${esc(p.name)}</h3><div class="small muted">${p.distanceKm} km · ~${p.etaMin} min ${p.open24h ? "· 24h" : ""}</div>
-      <div class="pills">${p.stock.map((s) => `<span class="pill ${s.exact ? "g" : "a"} ${s.stale ? "stale" : ""}">${esc(s.name)} · ${s.qty} ${L_("left", "باقی")} · ${s.priceRs ? "Rs " + s.priceRs : L_("free", "مفت")}</span>`).join("")}</div>
-      <div class="small muted">${L_("updated", "اپ ڈیٹ")} ${ago(Math.max(...p.stock.map((s) => s.updatedAt)))}</div></div></div>
+    return `<div class="card"><div class="row"><div class="grow"><h3>${esc(p.name)}</h3><div class="small muted">${p.distanceKm} km · ~${p.etaMin} min</div>
+      <div class="pills">${p.stock.map((s) => `<span class="pill ${s.exact ? "g" : "a"} ${s.stale ? "stale" : ""}">${esc(s.name)} · ${s.qty} ${L_("in stock", "موجود")}${s.priceRs ? " · Rs " + s.priceRs : ""}</span>`).join("")}</div>
+      <div class="small muted">${L_("reported", "رپورٹ")} ${ago(Math.max(...p.stock.map((s) => s.updatedAt || 0)))}</div></div></div>
       <div class="btns"><a class="btn p sm" target="_blank" rel="noopener" href="${dirUrl(p.lat, p.lon)}">🧭 ${L_("Directions", "راستہ")}</a><a class="btn sm" href="#/facility/${p.id}">${L_("Stock list", "اسٹاک")}</a></div></div>`;
   }
 
@@ -552,14 +481,15 @@
     const res = document.getElementById("res");
     api(`/blood/search?group=${encodeURIComponent(g)}&units=${params.get("units") || 2}&${locQ()}`).then((d) => renderBlood(res, d)).catch((e) => res.innerHTML = errBox(e));
   }
-  async function renderBlood(el, d) {
+  function renderBlood(el, d) {
     let html = `<div class="note small">ℹ️ ${L_(`A patient needing ${d.group} can usually receive: ${d.compatibleGroups.join(", ")}.`, `${d.group} کے مریض کو عام طور پر یہ گروپ لگ سکتے ہیں: ${d.compatibleGroups.join("، ")}`)} ${esc(d.compatNote)}</div>`;
-    html += d.banks.map((b, i) => `<div class="card ${i === 0 && b.enough ? "top1" : ""} ${b.stale ? "stale" : ""}"><div class="row"><div class="big ${b.exactUnits >= d.units ? "g" : b.exactUnits > 0 ? "a" : "r"}">${b.exactUnits}<small>${esc(d.group)} ${L_("units", "بوتلیں")}</small></div>
-      <div class="grow"><h3>${esc(b.name)}</h3><div class="small muted">${b.distanceKm} km · ~${b.etaMin} min · ${L_("updated", "اپ ڈیٹ")} ${ago(b.updatedAt)}${staleNote(b.updatedAt)}</div>
-      ${Object.keys(b.compatibleUnits).length ? `<div class="pills">${Object.entries(b.compatibleUnits).map(([g, u]) => `<span class="pill o">${L_("compatible", "موزوں")} ${g}: ${u}</span>`).join("")}</div>` : ""}</div></div>
+    if (!d.banks.some((b) => b.reported)) html += `<div class="note warn small">ℹ️ ${L_("These are real blood banks, but none has reported units yet. Please call them, or share a donor request below.", "یہ اصل بلڈ بینک ہیں مگر ابھی کسی نے یونٹس رپورٹ نہیں کیے۔")}</div>`;
+    html += d.banks.map((b, i) => `<div class="card ${i === 0 && b.enough ? "top1" : ""} ${b.stale ? "stale" : ""}"><div class="row"><div class="big ${b.exactUnits == null ? "x" : b.exactUnits >= d.units ? "g" : b.exactUnits > 0 ? "a" : "r"}">${b.exactUnits == null ? "?" : b.exactUnits}<small>${b.exactUnits == null ? L_("not<br>reported", "رپورٹ<br>نہیں") : esc(d.group) + " " + L_("units", "بوتلیں")}</small></div>
+      <div class="grow"><h3>${esc(b.name)}</h3><div class="small muted">${b.distanceKm} km · ~${b.etaMin} min${b.updatedAt ? " · " + L_("reported", "رپورٹ") + " " + ago(b.updatedAt) + staleNote(b.updatedAt) : ""}</div>
+      <div class="pills">${b.locationPrecision === "area" ? `<span class="pill a">${L_("approximate location", "اندازاً مقام")}</span>` : ""}${Object.entries(b.compatibleUnits).map(([g, u]) => `<span class="pill o">${L_("compatible", "موزوں")} ${g}: ${u}</span>`).join("")}</div></div></div>
       <div class="btns"><a class="btn p sm" target="_blank" rel="noopener" href="${dirUrl(b.lat, b.lon)}">🧭 ${L_("Directions", "راستہ")}</a></div></div>`).join("");
     html += `<div class="card"><h3>📣 ${L_("Ask donors on WhatsApp", "واٹس ایپ پر ڈونرز سے رابطہ")}</h3><p class="small muted">${L_("Creates a clear, ready-to-forward request in English and Urdu.", "انگریزی اور اردو میں واضح پیغام۔")}</p>
-      <div class="field"><select id="bHosp"><option>Mayo Hospital</option><option>Services Hospital</option><option>Jinnah Hospital</option><option>Sir Ganga Ram Hospital</option><option>Lahore General Hospital</option><option>Children's Hospital Lahore</option><option>Punjab Institute of Cardiology</option><option>Shaikh Zayed Hospital</option></select><input id="bContact" maxlength="30" placeholder="${L_("Contact number (optional)", "رابطہ نمبر (اختیاری)")}"></div>
+      <div class="field"><input id="bHosp" maxlength="80" placeholder="${L_("Hospital name, e.g. Mayo Hospital", "ہسپتال کا نام")}"><input id="bContact" maxlength="30" placeholder="${L_("Contact number (optional)", "رابطہ نمبر (اختیاری)")}"></div>
       <div class="btns"><button class="btn p" id="bReq">📲 ${L_("Create request & share", "درخواست بنائیں اور شیئر کریں")}</button></div><div id="bOut"></div></div>`;
     el.innerHTML = html;
     document.getElementById("bReq").onclick = async (ev) => {
@@ -575,7 +505,7 @@
   // ---- equipment
   function equipmentPage(params) {
     const t = params.get("type") || "CT";
-    $app.innerHTML = `<h1>🩻 ${L_("Where is it working right now?", "اس وقت کہاں چالو ہے؟")}</h1>${locationRow(true)}
+    $app.innerHTML = `<h1>🩻 ${L_("Where is it working?", "کہاں چالو ہے؟")}</h1>${locationRow(true)}
       <div class="chips">${EQUIP.map((x) => `<button class="chip ${x === t ? "on" : ""}" data-t="${x}">${x}</button>`).join("")}</div><div id="res">${skeleton(3)}</div>`;
     bindLocation(() => equipmentPage(params));
     $app.querySelectorAll("[data-t]").forEach((b) => b.onclick = () => { location.hash = "#/equipment?type=" + b.dataset.t; });
@@ -583,19 +513,21 @@
     api(`/equipment?type=${t}&${locQ()}`).then((d) => renderEquipment(res, d)).catch((e) => res.innerHTML = errBox(e));
   }
   function renderEquipment(el, d) {
-    el.innerHTML = `<h2>${esc(d.type)}</h2>` + (d.results.length ? d.results.map((r, i) => `<div class="card ${i === 0 && r.status === "working" ? "top1" : ""} ${r.stale ? "stale" : ""}"><div class="row"><div class="grow"><h3>${esc(r.name)}</h3>
-      <div class="pills">${eqPill(d.type, r)}${r.waitMin != null ? `<span class="pill x">${L_("queue", "قطار")} ${r.queue} · ~${r.waitMin} min ${L_("wait", "انتظار")}</span>` : ""}</div>
-      <div class="small muted">${r.distanceKm} km · ~${r.etaMin} min · ${L_("updated", "اپ ڈیٹ")} ${ago(r.updatedAt)}${staleNote(r.updatedAt)}</div></div></div>
-      <div class="btns"><a class="btn p sm" target="_blank" rel="noopener" href="${dirUrl(r.lat, r.lon)}">🧭 ${L_("Directions", "راستہ")}</a><a class="btn sm" href="#/facility/${r.id}">${L_("Details", "تفصیل")}</a></div></div>`).join("") : `<div class="empty">${L_("No hospital lists this machine.", "کسی ہسپتال میں یہ مشین درج نہیں۔")}</div>`);
+    const anyReported = d.results.some((r) => r.status !== "unknown");
+    el.innerHTML = `<h2>${esc(d.type)}</h2>` + (anyReported ? "" : `<div class="note warn small">ℹ️ ${L_(`No hospital has reported ${d.type} status yet. Nearest hospitals are listed; please call ahead.`, "ابھی کسی ہسپتال نے رپورٹ نہیں کیا؛ قریب ترین ہسپتال درج ہیں۔")}</div>`) +
+      d.results.slice(0, 12).map((r, i) => `<div class="card ${i === 0 && r.status === "working" ? "top1" : ""} ${r.stale ? "stale" : ""}"><div class="row"><div class="grow"><h3>${esc(r.name)}</h3>
+      <div class="pills">${ownPill(r.ownership)}${eqPill(d.type, r)}</div>
+      <div class="small muted">${r.distanceKm} km · ~${r.etaMin} min${r.updatedAt ? " · " + L_("reported", "رپورٹ") + " " + ago(r.updatedAt) + staleNote(r.updatedAt) : ""}</div></div></div>
+      <div class="btns"><a class="btn p sm" target="_blank" rel="noopener" href="${dirUrl(r.lat, r.lon)}">🧭 ${L_("Directions", "راستہ")}</a><a class="btn sm" href="#/facility/${r.id}">${L_("Details", "تفصیل")}</a></div></div>`).join("");
   }
 
   // ---- staff portal
   async function staffPage() {
     if (!state.staff) {
-      $app.innerHTML = `<h1>🧑‍⚕️ ${L_("Staff portal", "اسٹاف پورٹل")}</h1><div class="card"><p class="small muted">${L_("Ward staff, pharmacists and blood bank clerks keep Haazir accurate. Pick your facility.", "اپنا ادارہ منتخب کریں۔")}</p>
+      $app.innerHTML = `<h1>🧑‍⚕️ ${L_("Staff portal", "اسٹاف پورٹل")}</h1><div class="card"><p class="small muted">${L_("Ward staff, pharmacists and blood bank clerks keep Haazir accurate. Everything families see comes from these reports.", "خاندان جو کچھ دیکھتے ہیں وہ انہی رپورٹس سے آتا ہے۔")}</p>
         <div class="field"><select id="sFac"><option>${L_("Loading…", "لوڈ ہو رہا ہے…")}</option></select></div>
         <div class="field"><input id="sPin" type="password" inputmode="numeric" maxlength="8" placeholder="PIN"></div>
-        <div class="note small">${L_("Demo PIN:", "ڈیمو PIN:")} <b>1234</b></div>
+        <div class="note small">${L_("Pilot PIN:", "پائلٹ PIN:")} <b>1234</b>. ${L_("In a real rollout each staff member gets a verified account.", "اصل نظام میں ہر اسٹاف کا تصدیق شدہ اکاؤنٹ ہوگا۔")}</div>
         <div class="btns"><button class="btn p" id="sGo">${L_("Open portal", "پورٹل کھولیں")}</button></div><div id="sOut"></div></div>`;
       try {
         const d = await api("/facilities");
@@ -604,14 +536,14 @@
       } catch (e) { document.getElementById("sOut").innerHTML = errBox(e); }
       document.getElementById("sGo").onclick = async () => {
         const facilityId = document.getElementById("sFac").value, pin = document.getElementById("sPin").value;
-        try { const r = await post("/staff/login", { facilityId, pin }); state.staff = { facilityId, pin, name: r.facility.name, type: r.facility.type, tab: r.facility.type === "hospital" ? "alerts" : r.facility.type === "pharmacy" ? "stock" : "blood" }; staffPage(); }
+        try { const r = await post("/staff/login", { facilityId, pin }); state.staff = { facilityId, pin, name: r.facility.name, type: r.facility.type, tab: "quick" }; staffPage(); }
         catch (e) { document.getElementById("sOut").innerHTML = errBox(e); }
       };
       return;
     }
     const s = state.staff;
-    const tabs = s.type === "hospital" ? [["alerts", "🔔 " + L_("Alerts", "الرٹس")], ["quick", "⚡ " + L_("Quick update", "فوری اپ ڈیٹ")], ["beds", L_("Beds", "بستر")], ["doctors", L_("Doctors", "ڈاکٹر")], ["equipment", L_("Equipment", "مشینیں")], ["stock", L_("Dispensary", "ڈسپنسری")]]
-      : s.type === "pharmacy" ? [["stock", L_("Stock", "اسٹاک")], ["quick", "⚡ " + L_("Quick update", "فوری اپ ڈیٹ")]] : [["blood", L_("Blood", "خون")], ["quick", "⚡ " + L_("Quick update", "فوری اپ ڈیٹ")]];
+    const tabs = s.type === "hospital" ? [["quick", "⚡ " + L_("Quick update", "فوری اپ ڈیٹ")], ["alerts", "🔔 " + L_("Alerts", "الرٹس")], ["beds", L_("Beds", "بستر")], ["doctors", L_("Doctors", "ڈاکٹر")], ["equipment", L_("Machines", "مشینیں")]]
+      : s.type === "pharmacy" ? [["quick", "⚡ " + L_("Quick update", "فوری اپ ڈیٹ")], ["stock", L_("Stock", "اسٹاک")]] : [["quick", "⚡ " + L_("Quick update", "فوری اپ ڈیٹ")], ["blood", L_("Blood", "خون")]];
     $app.innerHTML = `<div class="row"><div class="grow"><h1>🧑‍⚕️ ${esc(s.name)}</h1></div><button class="btn sm" id="sOutBtn">${L_("Switch facility", "ادارہ تبدیل")}</button></div>
       <div class="tabs">${tabs.map(([k, l]) => `<button data-tab="${k}" class="${s.tab === k ? "on" : ""}">${l}</button>`).join("")}</div><div id="sBody">${skeleton(2)}</div>`;
     document.getElementById("sOutBtn").onclick = () => { state.staff = null; staffPage(); };
@@ -624,40 +556,44 @@
       let f;
       try { f = await api(`/facility/${s.facilityId}`); } catch (e) { body.innerHTML = errBox(e); return; }
       if (s.tab === "beds") {
-        body.innerHTML = `<div class="card">${Object.entries(f.beds).map(([k, b]) => `<div class="ctl"><div class="grow"><b>${esc(dept(k))}</b><div class="small muted">${L_("of", "میں سے")} ${b.total} · ${ago(b.updatedAt)}</div></div><button data-bed="${esc(k)}" data-d="-1">−</button><span class="n">${b.free}</span><button data-bed="${esc(k)}" data-d="1">+</button></div>`).join("")}<div class="small muted">${L_("Free beds. Tap + when a bed frees up and − when a patient is admitted.", "خالی بستر")}</div></div>`;
+        body.innerHTML = `<div class="card">${(f.departments || []).map((k) => { const b = f.beds[k]; return `<div class="ctl"><div class="grow"><b>${esc(dept(k))}</b><div class="small muted">${b ? L_("reported", "رپورٹ") + " " + ago(b.updatedAt) : NR()}</div></div>
+          ${b ? `<button data-bed="${esc(k)}" data-d="-1">−</button><span class="n">${b.free}</span><button data-bed="${esc(k)}" data-d="1">+</button>` : `<input type="number" min="0" max="500" class="btn sm" style="width:80px" data-bedset="${esc(k)}" placeholder="#"><button style="width:auto;padding:0 12px;font-size:14px" data-bedgo="${esc(k)}">${L_("Report", "رپورٹ")}</button>`}</div>`; }).join("")}
+          <div class="small muted">${L_("Free beds right now. Tap + when a bed frees up and − when a patient is admitted.", "اس وقت خالی بستر۔")}</div></div>`;
         body.querySelectorAll("[data-bed]").forEach((b) => b.onclick = () => send([{ kind: "bed", key: b.dataset.bed, delta: +b.dataset.d }]));
+        body.querySelectorAll("[data-bedgo]").forEach((b) => b.onclick = () => { const v = body.querySelector(`[data-bedset="${b.dataset.bedgo}"]`).value; if (v !== "") send([{ kind: "bed", key: b.dataset.bedgo, free: +v }]); });
       } else if (s.tab === "doctors") {
-        body.innerHTML = `<div class="card">${f.doctors.map((d) => `<div class="ctl"><div class="grow"><b>${esc(d.name)}</b> ${d.gender === "F" ? "♀" : ""}<div class="small muted">${esc(dept(d.dept))} · ${L_("shift ends", "شفٹ ختم")} ${esc(d.shiftEnds || "-")}</div></div><button style="width:auto;padding:0 12px;font-size:14px" class="${d.onDuty ? "" : ""}" data-doc="${esc(d.key)}" data-on="${d.onDuty ? 0 : 1}">${d.onDuty ? "✅ " + L_("On duty", "ڈیوٹی پر") : "⏸ " + L_("Off", "آف")}</button></div>`).join("")}</div>`;
-        body.querySelectorAll("[data-doc]").forEach((b) => b.onclick = () => send([{ kind: "doctor", key: b.dataset.doc, onDuty: b.dataset.on === "1" }]));
+        body.innerHTML = `<div class="card"><h3>${L_("Add doctor on duty", "ڈیوٹی ڈاکٹر شامل کریں")}</h3>
+          <div class="field"><input id="dName" maxlength="40" placeholder="${L_("Name, e.g. Dr Sana Khan", "نام")}"><select id="dDept">${(f.departments || []).map((d) => `<option value="${d}">${dept(d)}</option>`).join("")}</select></div>
+          <div class="field"><select id="dGender"><option value="">${L_("Gender (optional)", "جنس")}</option><option value="F">${L_("Female", "خاتون")}</option><option value="M">${L_("Male", "مرد")}</option></select><input id="dUntil" type="time" value="20:00"><button class="btn p" id="dAdd">${L_("Report on duty", "رپورٹ کریں")}</button></div></div>
+          <div class="card">${f.doctors.length ? f.doctors.map((d) => `<div class="ctl"><div class="grow"><b>${esc(d.name)}</b> ${d.gender === "F" ? "♀" : ""}<div class="small muted">${esc(dept(d.dept || ""))} · ${d.shiftEnds ? L_("until", "تک") + " " + esc(d.shiftEnds) : ""} · ${ago(d.updatedAt)}</div></div><button style="width:auto;padding:0 12px;font-size:14px" data-doc="${esc(d.key)}" data-name="${esc(d.name)}" data-on="${d.onDuty ? 0 : 1}">${d.onDuty ? "✅ " + L_("On duty", "ڈیوٹی پر") : "⏸ " + L_("Off", "آف")}</button></div>`).join("") : `<div class="muted small">${L_("No doctors reported yet.", "ابھی کوئی ڈاکٹر رپورٹ نہیں۔")}</div>`}</div>`;
+        document.getElementById("dAdd").onclick = () => { const n = document.getElementById("dName").value.trim(); if (n) send([{ kind: "doctor", name: n, dept: document.getElementById("dDept").value, gender: document.getElementById("dGender").value || null, onDuty: true, shiftEnds: document.getElementById("dUntil").value || null }]); };
+        body.querySelectorAll("[data-doc]").forEach((b) => b.onclick = () => send([{ kind: "doctor", key: b.dataset.doc, name: b.dataset.name, onDuty: b.dataset.on === "1" }]));
       } else if (s.tab === "equipment") {
-        body.innerHTML = `<div class="card">${Object.entries(f.equipment).map(([k, e]) => `<div class="ctl"><div class="grow"><b>${k}</b><div class="small muted">${ago(e.updatedAt)}</div></div><select data-eq="${k}" class="btn sm">${["working", "busy", "down"].map((st) => `<option ${st === e.status ? "selected" : ""}>${st}</option>`).join("")}</select></div>`).join("")}</div>`;
+        body.innerHTML = `<div class="card">${EQUIP.map((k) => { const e = f.equipment[k]; return `<div class="ctl"><div class="grow"><b>${k}</b><div class="small muted">${e ? L_("reported", "رپورٹ") + " " + ago(e.updatedAt) : NR()}</div></div><select data-eq="${k}" class="btn sm">${e ? "" : `<option selected disabled>${L_("choose…", "منتخب کریں…")}</option>`}${["working", "busy", "down"].map((st) => `<option ${e && st === e.status ? "selected" : ""} value="${st}">${st}</option>`).join("")}</select></div>`; }).join("")}</div>`;
         body.querySelectorAll("[data-eq]").forEach((sel) => sel.onchange = () => send([{ kind: "equipment", key: sel.dataset.eq, status: sel.value }]));
       } else if (s.tab === "stock") {
-        body.innerHTML = f.medicine.length ? `<div class="card">${f.medicine.map((m) => `<div class="ctl"><div class="grow"><b>${esc(m.name)}</b><div class="small muted">${ago(m.updatedAt)}</div></div><button data-med="${esc(m.key)}" data-d="-5">−</button><span class="n">${m.qty}</span><button data-med="${esc(m.key)}" data-d="5">+</button><button data-med0="${esc(m.key)}" style="width:auto;padding:0 10px;font-size:13px">${L_("Out", "ختم")}</button></div>`).join("")}</div>` : `<div class="empty">${L_("No stock listed", "کوئی اسٹاک نہیں")}</div>`;
+        body.innerHTML = `<div class="card"><h3>${L_("Report stock", "اسٹاک رپورٹ کریں")}</h3><p class="small muted">${L_("Fastest: use Quick update, e.g. 'Panadol khatam, Augmentin 20 packs aa gaye'.", "سب سے تیز: فوری اپ ڈیٹ استعمال کریں۔")}</p></div>
+          <div class="card">${f.medicine.length ? f.medicine.map((m) => `<div class="ctl"><div class="grow"><b>${esc(m.name)}</b><div class="small muted">${m.priceRs ? "Rs " + m.priceRs + " · " : ""}${ago(m.updatedAt)}</div></div><button data-med="${esc(m.key)}" data-d="-5">−</button><span class="n">${m.qty}</span><button data-med="${esc(m.key)}" data-d="5">+</button><button data-med0="${esc(m.key)}" style="width:auto;padding:0 10px;font-size:13px">${L_("Out", "ختم")}</button></div>`).join("") : `<div class="muted small">${L_("No stock reported yet.", "ابھی کوئی اسٹاک رپورٹ نہیں۔")}</div>`}</div>`;
         body.querySelectorAll("[data-med]").forEach((b) => b.onclick = () => send([{ kind: "medicine", key: b.dataset.med, delta: +b.dataset.d }]));
         body.querySelectorAll("[data-med0]").forEach((b) => b.onclick = () => send([{ kind: "medicine", key: b.dataset.med0, qty: 0 }]));
       } else if (s.tab === "blood") {
-        body.innerHTML = `<div class="card">${Object.entries(f.blood).map(([g, b]) => `<div class="ctl"><div class="grow"><b>${g}</b><div class="small muted">${ago(b.updatedAt)}</div></div><button data-bl="${g}" data-d="-1">−</button><span class="n">${b.units}</span><button data-bl="${g}" data-d="1">+</button></div>`).join("")}</div>`;
+        body.innerHTML = `<div class="card">${GROUPS.map((g) => { const b = f.blood[g]; return `<div class="ctl"><div class="grow"><b>${g}</b><div class="small muted">${b ? L_("reported", "رپورٹ") + " " + ago(b.updatedAt) : NR()}</div></div>${b ? `<button data-bl="${g}" data-d="-1">−</button><span class="n">${b.units}</span><button data-bl="${g}" data-d="1">+</button>` : `<input type="number" min="0" max="500" class="btn sm" style="width:80px" data-blset="${g}" placeholder="#"><button style="width:auto;padding:0 12px;font-size:14px" data-blgo="${g}">${L_("Report", "رپورٹ")}</button>`}</div>`; }).join("")}</div>`;
         body.querySelectorAll("[data-bl]").forEach((b) => b.onclick = () => send([{ kind: "blood", key: b.dataset.bl, delta: +b.dataset.d }]));
+        body.querySelectorAll("[data-blgo]").forEach((b) => b.onclick = () => { const v = body.querySelector(`[data-blset="${b.dataset.blgo}"]`).value; if (v !== "") send([{ kind: "blood", key: b.dataset.blgo, units: +v }]); });
       }
     }
     async function renderQuick() {
-      // build the example from this facility's own wards, machines, doctors and stock so it always parses
-      let ex = s.type === "pharmacy" ? "Panadol khatam, Augmentin 20 packs aa gaye" : s.type === "bloodbank" ? "O- 2 unit aa gaye, B+ 10 unit" : "Medicine ward 3 mein 2 bed khali, CT kharab hai, Dr Sana 8 baje tak duty pe";
-      try {
-        const f = await api(`/facility/${s.facilityId}`);
-        if (s.type === "hospital") {
-          const dept = Object.keys(f.beds).find((d) => d !== "Emergency") || "Emergency";
-          const eq = Object.keys(f.equipment).find((e) => e !== "Oxygen");
-          const doc = f.doctors.find((d) => !d.onDuty) || f.doctors[0];
-          const first = doc ? doc.name.replace(/^Dr\s+/, "").split(" ")[0] : null;
-          ex = `${dept.split("/")[0]} ward mein 2 bed khali` + (eq ? `, ${eq} kharab hai` : "") + (first ? `, Dr ${first} 8 baje tak duty pe` : "");
-        } else if (s.type === "pharmacy" && f.medicine.length > 1) {
-          ex = `${f.medicine[0].name.split(" ")[0]} khatam, ${f.medicine[1].name.split(" ")[0]} 20 packs aa gaye`;
-        }
-      } catch (e) {}
+      let ex = s.type === "pharmacy" ? "Panadol khatam, Augmentin 20 packs aa gaye" : s.type === "bloodbank" ? "O- 2 unit, B+ 10 unit" : "Medicine ward mein 2 bed khali, CT kharab hai, Dr Sana 8 baje tak duty pe";
+      if (s.type === "hospital") {
+        try {
+          const f = await api(`/facility/${s.facilityId}`);
+          const d0 = (f.departments || []).find((d) => d !== "Emergency") || "Emergency";
+          ex = `${d0.split("/")[0]} ward mein 2 bed khali, CT kharab hai, Dr Sana 8 baje tak duty pe`;
+        } catch (e) {}
+      }
       body.innerHTML = `<div class="card"><h3>⚡ ${L_("Type one message, the way you'd send it on WhatsApp", "ایک پیغام لکھیں، جیسے واٹس ایپ پر")}</h3>
-        <textarea id="qText" maxlength="500" placeholder="${esc(ex)}"></textarea><div class="btns"><button class="btn sm" id="qEx">${L_("Use example", "مثال")}</button><button class="btn p" id="qParse">${L_("Preview changes", "تبدیلیاں دیکھیں")}</button></div><div id="qOut"></div></div>`;
+        <p class="small muted">${L_("Only report what is true right now. Families will see it with your report time.", "صرف وہی رپورٹ کریں جو اس وقت درست ہو۔")}</p>
+        <textarea id="qText" maxlength="500" placeholder="${esc(ex)}"></textarea><div class="btns"><button class="btn sm" id="qEx">${L_("Show example", "مثال")}</button><button class="btn p" id="qParse">${L_("Preview changes", "تبدیلیاں دیکھیں")}</button></div><div id="qOut"></div></div>`;
       document.getElementById("qEx").onclick = () => { document.getElementById("qText").value = ex; };
       document.getElementById("qParse").onclick = async (ev) => {
         const text = document.getElementById("qText").value.trim();
@@ -668,12 +604,12 @@
           const r = await post("/staff/parse", { facilityId: s.facilityId, pin: s.pin, text });
           if (!r.changes.length) { out.innerHTML = `<div class="note warn">${L_("No changes understood. Try naming the ward, machine, doctor or medicine.", "کوئی تبدیلی سمجھ نہیں آئی۔")}</div>`; }
           else {
-            out.innerHTML = `<div class="note">${L_("Understood", "سمجھا گیا")} <span class="pill o">${r.understoodBy === "ai" ? "AI" : L_("keywords", "الفاظ")}</span></div>` +
+            out.innerHTML = `<div class="note">${L_("Understood. Untick anything that's wrong:", "سمجھا گیا؛ غلط کو ہٹا دیں:")} <span class="pill o">${r.understoodBy === "ai" ? "AI" : L_("keywords", "الفاظ")}</span></div>` +
               r.changes.map((c, i) => `<label class="ctl"><span class="grow">${esc(c.label)}</span><input type="checkbox" checked data-i="${i}" style="width:24px;height:24px"></label>`).join("") +
               `<div class="btns"><button class="btn p" id="qApply">✅ ${L_("Confirm & publish", "تصدیق کریں")}</button></div>`;
             document.getElementById("qApply").onclick = async () => {
               const chosen = r.changes.filter((c, i) => out.querySelector(`[data-i="${i}"]`).checked);
-              try { const u = await post("/staff/update", { facilityId: s.facilityId, pin: s.pin, changes: chosen }); out.innerHTML = `<div class="note">✅ ${u.applied.length} ${L_("updates published. Patients see them now.", "اپ ڈیٹس شائع ہو گئیں۔")}</div>`; }
+              try { const u = await post("/staff/update", { facilityId: s.facilityId, pin: s.pin, changes: chosen }); out.innerHTML = `<div class="note">✅ ${u.applied.length} ${L_("reports published. Families see them now.", "رپورٹس شائع ہو گئیں۔")}</div>`; }
               catch (e) { out.innerHTML = errBox(e); }
             };
           }
@@ -686,8 +622,8 @@
         try {
           const d = await post("/staff/alerts", { facilityId: s.facilityId, pin: s.pin });
           if (s.tab !== "alerts") return;
-          body.innerHTML = d.alerts.length ? d.alerts.map((a) => `<div class="card ${a.ack ? "stale" : "top1"}"><div class="row"><div class="grow"><b>${a.source === "ambulance" ? "🚑" : "👪"} ${esc(dept(a.department))}</b> · <span class="small muted">${ago(a.createdAt)}${a.etaSec ? " · ETA ~" + Math.round(a.etaSec / 60) + " min" : ""} · ${L_("ref", "ریف")} ${esc(a.id)}</span><div>${esc(a.note)}</div></div>
-            ${a.ack ? `<span class="pill g">${L_("acknowledged", "موصول")}</span>` : `<button class="btn p sm" data-ack="${esc(a.sk)}">${L_("Acknowledge", "موصول")}</button>`}</div></div>`).join("") : `<div class="empty">${L_("No incoming alerts. Families and ambulances that notify you will show up here.", "کوئی الرٹ نہیں۔")}</div>`;
+          body.innerHTML = d.alerts.length ? d.alerts.map((a) => `<div class="card ${a.ack ? "stale" : "top1"}"><div class="row"><div class="grow"><b>${a.source && a.source.startsWith("ambulance") ? "🚑" : "👪"} ${esc(dept(a.department))}</b> · <span class="small muted">${ago(a.createdAt)}${a.etaSec ? " · ETA ~" + Math.round(a.etaSec / 60) + " min" : ""} · ${L_("ref", "ریف")} ${esc(a.id)}</span><div>${esc(a.note)}</div></div>
+            ${a.ack ? `<span class="pill g">${L_("acknowledged", "موصول")}</span>` : `<button class="btn p sm" data-ack="${esc(a.sk)}">${L_("Acknowledge", "موصول")}</button>`}</div></div>`).join("") : `<div class="empty">${L_("No incoming alerts. Families who tap 'Tell hospital you're coming' will show up here.", "کوئی الرٹ نہیں۔")}</div>`;
           body.querySelectorAll("[data-ack]").forEach((b) => b.onclick = async () => { b.disabled = true; try { await post("/staff/alerts/ack", { facilityId: s.facilityId, pin: s.pin, sk: b.dataset.ack }); load(); } catch (e) { alert(e.message); } });
         } catch (e) { body.innerHTML = errBox(e); }
       }
@@ -699,36 +635,39 @@
 
   // ---- city dashboard
   async function dashboardPage() {
-    $app.innerHTML = `<h1>🗺️ ${L_("Lahore health capacity: live", "لاہور صحت کی گنجائش")}</h1><p class="muted small">${L_("For the health department and Rescue 1122 control rooms. Refreshes every 15 seconds. Pilot data is simulated.", "محکمہ صحت اور 1122 کے لیے۔ ہر 15 سیکنڈ میں تازہ۔ فرضی ڈیٹا۔")}</p>
+    $app.innerHTML = `<h1>🗺️ ${L_("Lahore health capacity", "لاہور صحت کی گنجائش")}</h1><p class="muted small">${L_("For the health department and emergency control rooms. Shows only what facilities have reported. Refreshes every 15 seconds.", "صرف رپورٹ شدہ معلومات۔ ہر 15 سیکنڈ میں تازہ۔")}</p>
       <div class="stats" id="dStats">${'<div class="stat skel" style="height:72px"></div>'.repeat(8)}</div>
-      <div class="legend" style="margin-top:12px"><span><span class="dot" style="background:#138a4a"></span> ${L_("hospital has room", "گنجائش")}</span><span><span class="dot" style="background:#b26a00"></span> ${L_("nearly full", "تقریباً بھرا")}</span><span><span class="dot" style="background:#c62828"></span> ${L_("full", "بھرا")}</span><span>🚑 ${L_("free", "فارغ")} / 🚨 ${L_("on a call", "مصروف")}</span><span><span class="dot" style="background:#7b5cd6"></span> ${L_("blood bank", "بلڈ بینک")}</span><span><span class="dot" style="background:#8a96a0"></span> ${L_("pharmacy", "فارمیسی")}</span></div>
+      <div class="legend" style="margin-top:12px"><span><span class="dot" style="background:#138a4a"></span> ${L_("reported beds free", "بستر خالی")}</span><span><span class="dot" style="background:#b26a00"></span> ${L_("few beds", "کم بستر")}</span><span><span class="dot" style="background:#c62828"></span> ${L_("reported full", "بھرا")}</span><span><span class="dot" style="background:#8a96a0"></span> ${L_("not reported yet", "رپورٹ نہیں")}</span><span><span class="dot" style="background:#7b5cd6"></span> ${L_("blood bank", "بلڈ بینک")}</span><span><span class="dot" style="background:#1e66f5"></span> ${L_("pharmacy", "فارمیسی")}</span></div>
       <div class="map tall" id="dMap"></div><div class="grid2" id="dLists"></div>`;
-    const m = makeMap(document.getElementById("dMap"), [31.51, 74.32], 12);
-    const layers = m ? { hosp: window.L.layerGroup().addTo(m), amb: window.L.layerGroup().addTo(m), bb: window.L.layerGroup().addTo(m), ph: window.L.layerGroup() } : null;
-    if (m) window.L.control.layers(null, { [L_("Hospitals", "ہسپتال")]: layers.hosp, [L_("Ambulances", "ایمبولینس")]: layers.amb, [L_("Blood banks", "بلڈ بینک")]: layers.bb, [L_("Pharmacies", "فارمیسیاں")]: layers.ph }).addTo(m);
+    const m = makeMap(document.getElementById("dMap"), [31.50, 74.31], 11);
+    const layers = m ? { hosp: window.L.layerGroup().addTo(m), bb: window.L.layerGroup().addTo(m), ph: window.L.layerGroup() } : null;
+    if (m) window.L.control.layers(null, { [L_("Hospitals", "ہسپتال")]: layers.hosp, [L_("Blood banks", "بلڈ بینک")]: layers.bb, [L_("Pharmacies", "فارمیسیاں")]: layers.ph }).addTo(m);
     async function load() {
       try {
         const [s, mp] = await Promise.all([api("/stats"), api("/map")]);
         const c = s.counters || {};
         const ds = document.getElementById("dStats");
         if (!ds) return;
-        ds.innerHTML = [[s.freeBedsTotal, L_("free beds", "خالی بستر")], [s.hospitalsFull.length, L_("ERs full", "ایمرجنسی بھری")], [`${s.ambulancesAvailable}/${s.ambulancesTotal}`, L_("ambulances free", "ایمبولینس فارغ")], [s.machinesDown.length, L_("machines down", "مشینیں خراب")],
-          [s.bloodShortages.join(" ") || "-", L_("blood shortages (<5 units)", "خون کی کمی")], [c.searches || 0, L_("searches", "تلاش")], [c.ambulanceRequests || 0, L_("ambulance requests", "ایمبولینس درخواستیں")], [c.estMinutesSaved || 0, L_("est. minutes saved", "منٹ بچائے")]]
+        ds.innerHTML = [[`${s.hospitalsReporting}/${s.hospitals}`, L_("hospitals reporting", "ہسپتال رپورٹ کر رہے ہیں")], [`${s.pharmaciesReporting}/${s.pharmacies}`, L_("pharmacies reporting", "فارمیسیاں رپورٹ کر رہی ہیں")], [`${s.bloodBanksReporting}/${s.bloodBanks}`, L_("blood banks reporting", "بلڈ بینک رپورٹ کر رہے ہیں")], [s.reportedFreeBeds, L_("reported free beds", "رپورٹ شدہ خالی بستر")],
+          [s.hospitalsReportedFull.length, L_("ERs reported full", "ایمرجنسی بھری (رپورٹ)")], [s.machinesReportedDown.length, L_("machines reported down", "خراب مشینیں (رپورٹ)")], [c.searches || 0, L_("family searches", "تلاشیں")], [c.staffUpdates || 0, L_("staff reports", "اسٹاف رپورٹس")]]
           .map(([b, t]) => `<div class="stat"><b>${esc(b)}</b><span>${t}</span></div>`).join("");
         if (layers) {
           Object.values(layers).forEach((l) => l.clearLayers());
           mp.facilities.forEach((f) => {
-            if (f.type === "hospital") window.L.circleMarker([f.lat, f.lon], { radius: 11, weight: 2, color: "#fff", fillColor: f.capacity < 0.8 ? "#138a4a" : f.capacity < 0.95 ? "#b26a00" : "#c62828", fillOpacity: .95 }).addTo(layers.hosp).bindPopup(`<b>${esc(f.name)}</b><br>${f.ownership === "private" ? L_("Private · fees", "پرائیویٹ") : L_("Government · free", "سرکاری")}<br>${f.freeBeds} ${L_("free beds", "خالی بستر")} · ER ${esc(f.erLoad)}<br><a href="#/facility/${f.id}">${L_("Details", "تفصیل")}</a>`);
-            else if (f.type === "bloodbank") window.L.circleMarker([f.lat, f.lon], { radius: 7, color: "#7b5cd6", fillOpacity: .9 }).addTo(layers.bb).bindPopup(esc(f.name));
-            else window.L.circleMarker([f.lat, f.lon], { radius: 5, color: "#8a96a0", fillOpacity: .8 }).addTo(layers.ph).bindPopup(esc(f.name));
+            if (f.type === "hospital") {
+              const col = !f.reported ? "#8a96a0" : f.reportedFreeBeds === 0 ? "#c62828" : f.reportedFreeBeds <= 3 ? "#b26a00" : "#138a4a";
+              window.L.circleMarker([f.lat, f.lon], { radius: 10, weight: 2, color: "#fff", fillColor: col, fillOpacity: .95 }).addTo(layers.hosp)
+                .bindPopup(`<b>${esc(f.name)}</b><br>${f.ownership === "private" ? L_("Private · fees", "پرائیویٹ") : L_("Government · free", "سرکاری")}<br>${f.reported ? f.reportedFreeBeds + " " + L_("reported free beds", "خالی بستر") : NR()}<br><a href="#/facility/${f.id}">${L_("Details", "تفصیل")}</a>`);
+            } else if (f.type === "bloodbank") window.L.circleMarker([f.lat, f.lon], { radius: 7, color: "#7b5cd6", fillOpacity: .9 }).addTo(layers.bb).bindPopup(esc(f.name));
+            else window.L.circleMarker([f.lat, f.lon], { radius: 4, color: "#1e66f5", fillOpacity: .8 }).addTo(layers.ph).bindPopup(esc(f.name));
           });
-          mp.ambulances.forEach((a) => window.L.marker([a.lat, a.lon], { icon: dotIcon(a.status === "available" ? "🚑" : "🚨") }).addTo(layers.amb).bindPopup(`${esc(a.id)} · ${esc(a.type)} · ${esc(a.status)}`));
         }
         const dl = document.getElementById("dLists");
-        if (dl) dl.innerHTML = `<div class="card"><h3>${L_("Free beds by department", "شعبہ وار خالی بستر")}</h3><table class="t">${Object.entries(s.freeBedsByDept).map(([k, v]) => `<tr><td>${esc(dept(k))}</td><td><span class="pill ${v === 0 ? "r" : v < 10 ? "a" : "g"}">${v}</span></td></tr>`).join("")}</table></div>
-          <div class="card"><h3>${L_("Needs attention", "توجہ طلب")}</h3><div class="small"><b>${L_("ERs at capacity", "بھری ایمرجنسی")}:</b> ${s.hospitalsFull.map(esc).join(", ") || "-"}</div>
-          <div class="small" style="margin-top:6px"><b>${L_("Machines down", "خراب مشینیں")}:</b> ${s.machinesDown.map((x) => `${esc(x.equipment)} (${esc(x.hospital)})`).join(", ") || "-"}</div>
-          <div class="small" style="margin-top:6px"><b>${L_("Blood units city-wide", "شہر بھر میں خون")}:</b> ${Object.entries(s.bloodUnits).map(([g, u]) => `<span class="pill ${u < 5 ? "r" : "g"}">${g} ${u}</span>`).join(" ")}</div></div>`;
+        const deptRows = Object.entries(s.reportedFreeBedsByDept);
+        if (dl) dl.innerHTML = `<div class="card"><h3>${L_("Reported free beds by department", "شعبہ وار رپورٹ شدہ بستر")}</h3>${deptRows.length ? `<table class="t">${deptRows.map(([k, v]) => `<tr><td>${esc(dept(k))}</td><td><span class="pill ${v === 0 ? "r" : v < 4 ? "a" : "g"}">${v}</span></td></tr>`).join("")}</table>` : `<div class="muted small">${L_("No bed reports yet.", "ابھی کوئی رپورٹ نہیں۔")}</div>`}</div>
+          <div class="card"><h3>${L_("Needs attention (reported)", "توجہ طلب (رپورٹ)")}</h3><div class="small"><b>${L_("ERs reported full", "بھری ایمرجنسی")}:</b> ${s.hospitalsReportedFull.map(esc).join(", ") || "-"}</div>
+          <div class="small" style="margin-top:6px"><b>${L_("Machines reported down", "خراب مشینیں")}:</b> ${s.machinesReportedDown.map((x) => `${esc(x.equipment)} (${esc(x.hospital)})`).join(", ") || "-"}</div>
+          <div class="small" style="margin-top:6px"><b>${L_("Blood units reported", "رپورٹ شدہ خون")}:</b> ${Object.entries(s.reportedBloodUnits).map(([g, u]) => `<span class="pill ${u < 5 ? "r" : "g"}">${g} ${u}</span>`).join(" ") || "-"}</div></div>`;
       } catch (e) { const ds = document.getElementById("dStats"); if (ds) ds.innerHTML = errBox(e); }
     }
     await load();
@@ -751,7 +690,7 @@
       case "ask": return askPage(params);
       case "hospitals": return hospitalsPage(params);
       case "facility": return facilityPage(parts[1]);
-      case "ambulance": return parts[1] ? ambulanceTrack(parts[1]) : ambulancePage();
+      case "ambulance": return ambulancePage();
       case "medicine": return medicinePage(params);
       case "blood": return bloodPage(params);
       case "equipment": return equipmentPage(params);
