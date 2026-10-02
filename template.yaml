@@ -1,0 +1,162 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: Haazir - Pakistan's live healthcare availability network (pilot, simulated data)
+
+Parameters:
+  ModelId:
+    Type: String
+    Default: us.amazon.nova-lite-v1:0
+  StaffPin:
+    Type: String
+    Default: "1234"
+    NoEcho: true
+  DemoMode:
+    Type: String
+    Default: "true"
+    AllowedValues: ["true", "false"]
+
+Globals:
+  Function:
+    Runtime: python3.12
+    Architectures: [arm64]
+    MemorySize: 512
+    CodeUri: backend/
+    Environment:
+      Variables:
+        TABLE_NAME: !Ref DataTable
+        MODEL_ID: !Ref ModelId
+        STAFF_PIN: !Ref StaffPin
+        DEMO_MODE: !Ref DemoMode
+
+Resources:
+  DataTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: HaazirData
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - { AttributeName: pk, AttributeType: S }
+        - { AttributeName: sk, AttributeType: S }
+      KeySchema:
+        - { AttributeName: pk, KeyType: HASH }
+        - { AttributeName: sk, KeyType: RANGE }
+
+  HttpApi:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      CorsConfiguration:
+        AllowOrigins: ["*"]
+        AllowMethods: [GET, POST, OPTIONS]
+        AllowHeaders: [content-type]
+        MaxAge: 600
+      DefaultRouteSettings:
+        ThrottlingBurstLimit: 50
+        ThrottlingRateLimit: 25
+
+  ApiFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: haazir-api
+      Handler: handler.api
+      Timeout: 29
+      Policies:
+        - DynamoDBCrudPolicy: { TableName: !Ref DataTable }
+        - Statement:
+            - Effect: Allow
+              Action: [bedrock:InvokeModel, bedrock:InvokeModelWithResponseStream]
+              Resource:
+                - arn:aws:bedrock:*::foundation-model/*
+                - !Sub arn:aws:bedrock:*:${AWS::AccountId}:inference-profile/*
+            - Effect: Allow
+              Action: [aws-marketplace:ViewSubscriptions, aws-marketplace:Subscribe]
+              Resource: "*"
+      Events:
+        Api:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Path: /{proxy+}
+            Method: ANY
+
+  SimulatorFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: haazir-simulator
+      Handler: handler.api
+      Timeout: 300
+      Policies:
+        - DynamoDBCrudPolicy: { TableName: !Ref DataTable }
+      Events:
+        Every5Min:
+          Type: Schedule
+          Properties:
+            Schedule: rate(5 minutes)
+            Input: '{"action": "simulate"}'
+
+  SiteBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault: { SSEAlgorithm: AES256 }
+
+  SiteOAC:
+    Type: AWS::CloudFront::OriginAccessControl
+    Properties:
+      OriginAccessControlConfig:
+        Name: !Sub haazir-oac-${AWS::StackName}
+        OriginAccessControlOriginType: s3
+        SigningBehavior: always
+        SigningProtocol: sigv4
+
+  SiteDistribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Enabled: true
+        Comment: Haazir pilot site
+        DefaultRootObject: index.html
+        HttpVersion: http2and3
+        PriceClass: PriceClass_All
+        Origins:
+          - Id: site
+            DomainName: !GetAtt SiteBucket.RegionalDomainName
+            OriginAccessControlId: !GetAtt SiteOAC.Id
+            S3OriginConfig: { OriginAccessIdentity: "" }
+        DefaultCacheBehavior:
+          TargetOriginId: site
+          ViewerProtocolPolicy: redirect-to-https
+          Compress: true
+          CachePolicyId: 658327ea-f89d-4fab-a63d-7e88639e58f6  # Managed-CachingOptimized
+        CustomErrorResponses:
+          - { ErrorCode: 403, ResponseCode: 200, ResponsePagePath: /index.html }
+          - { ErrorCode: 404, ResponseCode: 200, ResponsePagePath: /index.html }
+
+  SiteBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref SiteBucket
+      PolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal: { Service: cloudfront.amazonaws.com }
+            Action: s3:GetObject
+            Resource: !Sub ${SiteBucket.Arn}/*
+            Condition:
+              StringEquals:
+                AWS:SourceArn: !Sub arn:aws:cloudfront::${AWS::AccountId}:distribution/${SiteDistribution}
+
+Outputs:
+  ApiUrl:
+    Value: !Sub https://${HttpApi}.execute-api.${AWS::Region}.amazonaws.com
+  SiteUrl:
+    Value: !Sub https://${SiteDistribution.DomainName}
+  SiteBucketName:
+    Value: !Ref SiteBucket
+  DistributionId:
+    Value: !Ref SiteDistribution
