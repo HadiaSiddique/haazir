@@ -682,7 +682,7 @@
     const params = new URLSearchParams(qs || "");
     const parts = path.split("/").filter(Boolean);
     window.scrollTo(0, 0);
-    if (!API) { $app.innerHTML = errBox("API not configured"); return; }
+    if (window.HAAZIR_API === undefined) { $app.innerHTML = errBox("API not configured"); return; }
     if (!parts.length) return home();
     switch (parts[0]) {
       case "ask": return askPage(params);

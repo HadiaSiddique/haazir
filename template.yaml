@@ -14,13 +14,19 @@ Parameters:
     Type: String
     Default: "true"
     AllowedValues: ["true", "false"]
+  EnableCdn:
+    Type: String
+    Default: "false"
+    AllowedValues: ["true", "false"]
+
+Conditions:
+  UseCdn: !Equals [!Ref EnableCdn, "true"]
 
 Globals:
   Function:
     Runtime: python3.12
     Architectures: [arm64]
     MemorySize: 512
-    CodeUri: backend/
     Environment:
       Variables:
         TABLE_NAME: !Ref DataTable
@@ -57,6 +63,7 @@ Resources:
     Type: AWS::Serverless::Function
     Properties:
       FunctionName: haazir-api
+      CodeUri: backend/
       Handler: handler.api
       Timeout: 29
       Policies:
@@ -77,11 +84,18 @@ Resources:
             ApiId: !Ref HttpApi
             Path: /{proxy+}
             Method: ANY
+        Root:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Path: /
+            Method: GET
 
   SimulatorFunction:
     Type: AWS::Serverless::Function
     Properties:
       FunctionName: haazir-simulator
+      CodeUri: backend/
       Handler: handler.api
       Timeout: 300
       Policies:
@@ -94,6 +108,7 @@ Resources:
             Input: '{"action": "simulate"}'
 
   SiteBucket:
+    Condition: UseCdn
     Type: AWS::S3::Bucket
     Properties:
       PublicAccessBlockConfiguration:
@@ -106,6 +121,7 @@ Resources:
           - ServerSideEncryptionByDefault: { SSEAlgorithm: AES256 }
 
   SiteOAC:
+    Condition: UseCdn
     Type: AWS::CloudFront::OriginAccessControl
     Properties:
       OriginAccessControlConfig:
@@ -115,6 +131,7 @@ Resources:
         SigningProtocol: sigv4
 
   SiteDistribution:
+    Condition: UseCdn
     Type: AWS::CloudFront::Distribution
     Properties:
       DistributionConfig:
@@ -138,6 +155,7 @@ Resources:
           - { ErrorCode: 404, ResponseCode: 200, ResponsePagePath: /index.html }
 
   SiteBucketPolicy:
+    Condition: UseCdn
     Type: AWS::S3::BucketPolicy
     Properties:
       Bucket: !Ref SiteBucket
@@ -155,8 +173,11 @@ Outputs:
   ApiUrl:
     Value: !Sub https://${HttpApi}.execute-api.${AWS::Region}.amazonaws.com
   SiteUrl:
+    Condition: UseCdn
     Value: !Sub https://${SiteDistribution.DomainName}
   SiteBucketName:
+    Condition: UseCdn
     Value: !Ref SiteBucket
   DistributionId:
+    Condition: UseCdn
     Value: !Ref SiteDistribution

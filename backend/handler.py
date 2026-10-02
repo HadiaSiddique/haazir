@@ -489,6 +489,30 @@ ROUTES = [
 ]
 
 
+# The site can also be served straight from this Lambda (same origin as the API), so the app stays
+# reachable even before/without CloudFront. Files are copied into backend/static by deploy.ps1.
+STATIC_DIR = os.path.join(os.path.dirname(__file__), "static")
+STATIC = {"/": ("index.html", "text/html; charset=utf-8"), "/index.html": ("index.html", "text/html; charset=utf-8"),
+          "/app.js": ("app.js", "application/javascript; charset=utf-8"),
+          "/styles.css": ("styles.css", "text/css; charset=utf-8"),
+          "/config.js": (None, "application/javascript"), "/og.png": ("og.png", "image/png")}
+
+
+def static_file(path):
+    name, ctype = STATIC[path]
+    headers = {"content-type": ctype, "cache-control": "public, max-age=60"}
+    if name is None:
+        return {"statusCode": 200, "headers": headers, "body": "window.HAAZIR_API = '';"}
+    fp = os.path.join(STATIC_DIR, name)
+    if not os.path.exists(fp):
+        return resp(404, {"error": "Not found"})
+    with open(fp, "rb") as fh:
+        data = fh.read()
+    if ctype.startswith("image/"):
+        return {"statusCode": 200, "headers": headers, "isBase64Encoded": True, "body": base64.b64encode(data).decode()}
+    return {"statusCode": 200, "headers": headers, "body": data.decode("utf-8")}
+
+
 def api(event, context=None):
     # direct invocations (deploy script)
     if event.get("action") == "seed":
@@ -502,6 +526,8 @@ def api(event, context=None):
     path = re.sub(r"^/api", "", path).rstrip("/") or "/"
     if method == "OPTIONS":
         return resp(204, {})
+    if method == "GET" and path in STATIC:
+        return static_file(path)
     for m, pat, fn in ROUTES:
         mt = re.match(pat, path)
         if m == method and mt:
