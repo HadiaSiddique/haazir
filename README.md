@@ -4,7 +4,7 @@
 
 > ⚠️ **Pilot demo.** All availability data is **simulated**. It is not connected to any real hospital, pharmacy, blood bank or Rescue 1122. In an emergency, call **1122**.
 
-**Live:** https://1hm4lz3iy8.execute-api.us-east-1.amazonaws.com/ · Staff portal demo PIN: `1234`
+**Live:** https://d1zq9eagbu3k0c.cloudfront.net (backup: https://1hm4lz3iy8.execute-api.us-east-1.amazonaws.com/) · Staff portal demo PIN: `1234`
 
 Built for the AWS Builder Center **Zero to Shipped** hackathon. Category: **Social Good (Health)**. Lane: **Community**.
 

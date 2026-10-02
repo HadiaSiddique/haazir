@@ -1,7 +1,7 @@
 # Haazir deploy: package + deploy the SAM template with the AWS CLI, seed (first time), publish the site.
-# Usage:  .\deploy.ps1 [-Seed] [-Cdn] [-ModelId <id>]
-#   The site is always served by the API Lambda (same URL as the API). -Cdn also creates S3 + CloudFront.
-param([switch]$Seed, [switch]$Cdn, [string]$ModelId = "")
+# Usage:  .\deploy.ps1 [-Seed] [-NoCdn] [-ModelId <id>]
+#   The site is always served by the API Lambda (same URL as the API). S3 + CloudFront are kept unless -NoCdn.
+param([switch]$Seed, [switch]$NoCdn, [string]$ModelId = "")
 $ErrorActionPreference = "Continue"  # native CLI stderr must not abort; we check $LASTEXITCODE
 $env:Path = [System.Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path", "User")
 $Region = "us-east-1"; $Stack = "haazir"
@@ -20,7 +20,7 @@ aws s3api head-bucket --bucket $Artifacts --region $Region 2>&1 | Out-Null
 if ($LASTEXITCODE -ne 0) { aws s3 mb "s3://$Artifacts" --region $Region | Out-Null }
 aws cloudformation package --template-file template.yaml --s3-bucket $Artifacts --output-template-file .packaged.yaml --region $Region | Out-Null
 if ($LASTEXITCODE -ne 0) { throw "package failed" }
-$params = @("EnableCdn=$(if ($Cdn) { 'true' } else { 'false' })")
+$params = @("EnableCdn=$(if ($NoCdn) { 'false' } else { 'true' })")
 if ($ModelId) { $params += "ModelId=$ModelId" }
 aws cloudformation deploy --template-file .packaged.yaml --stack-name $Stack --capabilities CAPABILITY_IAM CAPABILITY_AUTO_EXPAND --region $Region --no-fail-on-empty-changeset --parameter-overrides @params
 if ($LASTEXITCODE -ne 0) { throw "CloudFormation deploy failed" }

@@ -1,6 +1,6 @@
 # Haazir: Know before you go. Live beds, doctors, ambulances, medicines and blood for Pakistan's hospitals
 
-**🔗 Live app:** https://1hm4lz3iy8.execute-api.us-east-1.amazonaws.com/
+**🔗 Live app:** https://d1zq9eagbu3k0c.cloudfront.net (backup: https://1hm4lz3iy8.execute-api.us-east-1.amazonaws.com/)
 **Category:** Social Good (Health: access to quality health services) · **Lane:** Community
 **Tags:** #social-good #community
 **Try it:** type *"abbu ko seenay mein dard"* on the home page · Staff portal demo PIN: **1234**
@@ -65,7 +65,8 @@ flowchart LR
 - **Amazon DynamoDB** (on-demand): one generic *facility + resource* model (beds, doctors, equipment, medicine, blood) so every module reuses the same code. Every row has `updatedAt` / `updatedBy`.
 - **Amazon Bedrock (Converse API)**: intent understanding, triage extraction, staff-message parsing, prescription **vision** reading, short Urdu/English explanations.
 - **Amazon EventBridge Scheduler**: every 5 minutes the demo simulator nudges beds, rotates doctor shifts, changes stock and blood, flips machine status and moves idle ambulances, so the pilot feels alive.
-- **AWS CloudFormation + SAM**: the whole stack is one template, deployed from the AWS CLI. [If CloudFront went live, add: **Amazon S3 + CloudFront (OAC)** for the static site.]
+- **AWS CloudFormation + SAM**: the whole stack is one template, deployed from the AWS CLI.
+- **Amazon S3 + Amazon CloudFront (Origin Access Control)**: private bucket, HTTPS, global edge caching for the site.
 
 ### Design principles
 1. **AI understands language; a transparent formula decides.** Bedrock never picks the hospital. The ranking (free beds, specialist on duty, machine working, ER load, ETA) is deterministic and explained to the user.
@@ -107,4 +108,4 @@ What the agent did, from my build log (`proof/agent-log.md`):
 From an idea to a live, tested app on AWS in one night.
 
 ---
-**Live:** https://1hm4lz3iy8.execute-api.us-east-1.amazonaws.com/ · **Category:** Social Good (Health) · **Lane:** Community · #social-good #community
+**Live:** https://d1zq9eagbu3k0c.cloudfront.net (backup: https://1hm4lz3iy8.execute-api.us-east-1.amazonaws.com/) · **Category:** Social Good (Health) · **Lane:** Community · #social-good #community
