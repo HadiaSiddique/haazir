@@ -196,3 +196,31 @@ footer { border-top: 1px solid var(--line); padding: 20px 0 40px; color: var(--m
 .medinfo .use { background: var(--brand-l); border-radius: 10px; padding: 10px 12px; }
 .rxb { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 10px; font-weight: 800; font-size: 14px; }
 .rxb.rx { background: var(--bad-l); color: var(--bad); } .rxb.otc { background: var(--ok-l); color: var(--ok); } .rxb.ask { background: var(--warn-l); color: var(--warn); }
+
+/* ---------- illustrations ---------- */
+.scene { margin-top: 16px; border-radius: 20px; overflow: hidden; border: 1px solid var(--line); box-shadow: var(--shadow); line-height: 0; }
+.scene svg { width: 100%; height: 200px; display: block; }
+@media (max-width: 600px) { .scene svg { height: 140px; } }
+.art svg { width: 100%; height: auto; display: block; }
+.art.sm { max-width: 170px; margin: 6px 0 10px; }
+.card.art { padding: 10px; }
+.showcase { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+@media (max-width: 860px) { .showcase { grid-template-columns: repeat(2, 1fr); } }
+.showcard { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 12px; text-decoration: none; color: var(--ink); box-shadow: var(--shadow); display: flex; flex-direction: column; gap: 4px; transition: transform .12s, border-color .12s; }
+.showcard:hover { transform: translateY(-3px); border-color: var(--brand); }
+.showcard b { font-size: 17px; margin-top: 6px; } .showcard span { font-size: 13px; color: var(--muted); }
+
+/* ---------- footer ---------- */
+footer { background: #0d2f2d; color: #c9dedc; border-top: 0; padding: 36px 0 20px; margin-top: 40px; }
+footer a { color: #e8f4f3; text-decoration: none; }
+footer a:hover { text-decoration: underline; }
+footer .logo { color: #fff; } footer .logo small { color: #9fc9c5; }
+.fgrid { display: grid; grid-template-columns: 1.6fr 1fr 1fr 1fr 1fr; gap: 24px; }
+@media (max-width: 860px) { .fgrid { grid-template-columns: 1fr 1fr; } .fcol.about { grid-column: 1 / -1; } }
+.fcol { display: flex; flex-direction: column; gap: 8px; font-size: 14px; }
+.fcol h4 { color: #fff; margin: 0 0 4px; font-size: 15px; }
+.fcol p { margin: 6px 0 10px; line-height: 1.6; }
+.fcol .btn { align-self: flex-start; }
+.fcol a.em { color: #ffb4b4; font-weight: 700; }
+.fbottom { border-top: 1px solid rgba(255,255,255,.12); margin-top: 26px; padding-top: 14px; display: flex; flex-wrap: wrap; gap: 8px 18px; font-size: 12px; color: #9fbcb9; }
+.fbottom a { color: #ffb4b4; }

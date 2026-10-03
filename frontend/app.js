@@ -90,7 +90,31 @@
       link("#/staff", "Staff", "اسٹاف") +
       `<button class="lang" id="langBtn">${state.lang === "ur" ? "English" : "اردو"}</button>`;
     document.getElementById("langBtn").onclick = () => { state.lang = state.lang === "ur" ? "en" : "ur"; store("lang", state.lang); route(); };
-    document.getElementById("foot").innerHTML = `<b>Haazir حاضر</b> · ${L_("Pilot for Lahore. Hospital, pharmacy and blood bank names and locations are real (OpenStreetMap, Wikipedia, public listings). " + (state.demo ? "Pilot: availability numbers (beds, doctors, machines, stock, blood) are sample data; doctor names are fictional." : "Showing real staff reports only.") + " Not connected to any hospital system or to Rescue 1122. In an emergency call", "لاہور کے لیے پائلٹ۔ دستیابی صرف اسٹاف کی رپورٹ پر۔ ایمرجنسی میں کال کریں")} <a href="tel:1122">1122</a>. ${L_("Haazir routes you to care. It does not diagnose.", "حاضر تشخیص نہیں کرتا، صرف راستہ دکھاتا ہے۔")} · Map data © OpenStreetMap contributors · Built on AWS.`;
+    const yr = new Date().getFullYear();
+    document.getElementById("foot").innerHTML = `
+      <div class="fgrid">
+        <div class="fcol about"><a class="logo" href="#/"><span class="logo-mark">✚</span>Haazir <small>حاضر</small></a>
+          <p>${L_("Know before you go. Haazir helps families in Lahore find a free bed, a doctor on duty, a working machine, medicine and blood, and helps hospital staff share it in one message.", "جانے سے پہلے جانیں۔ حاضر لاہور کے خاندانوں کو بستر، ڈاکٹر، مشین، دوا اور خون تلاش کرنے میں مدد دیتا ہے۔")}</p>
+          <a class="btn p sm" href="#/contact">✉️ ${L_("Contact us", "رابطہ کریں")}</a></div>
+        <div class="fcol"><h4>${L_("Find care", "علاج تلاش کریں")}</h4>
+          <a href="#/hospitals">${L_("Hospital beds", "ہسپتال بستر")}</a><a href="#/ambulance">${L_("Ambulance", "ایمبولینس")}</a><a href="#/medicine">${L_("Medicine", "دوا")}</a>
+          <a href="#/blood">${L_("Blood", "خون")}</a><a href="#/equipment">CT / MRI / ${L_("Dialysis", "ڈائیلاسز")}</a><a href="#/dashboard">${L_("City dashboard", "شہر ڈیش بورڈ")}</a></div>
+        <div class="fcol"><h4>${L_("For hospitals", "ہسپتالوں کے لیے")}</h4>
+          <a href="#/staff">${L_("Staff portal", "اسٹاف پورٹل")}</a><a href="#/contact?role=hospital">${L_("Join the pilot", "پائلٹ میں شامل ہوں")}</a>
+          <a href="#/contact?role=pharmacy">${L_("Pharmacies", "فارمیسیاں")}</a><a href="#/contact?role=bloodbank">${L_("Blood banks", "بلڈ بینک")}</a></div>
+        <div class="fcol"><h4>${L_("Emergency numbers", "ایمرجنسی نمبر")}</h4>
+          <a href="tel:1122" class="em">🚑 Rescue 1122</a><a href="tel:115" class="em">🚑 Edhi ${L_("Ambulance", "ایمبولینس")} 115</a>
+          <a href="tel:15">🚓 ${L_("Police", "پولیس")} 15</a><a href="tel:16">🚒 ${L_("Fire brigade", "فائر بریگیڈ")} 16</a></div>
+        <div class="fcol"><h4>${L_("Contact", "رابطہ")}</h4>
+          <span>📍 Lahore, Punjab, Pakistan</span><a href="#/contact">✉️ ${L_("Send us a message", "پیغام بھیجیں")}</a>
+          <a href="#/contact?role=health_department">🏛️ ${L_("Health department partners", "محکمہ صحت")}</a></div>
+      </div>
+      <div class="fbottom">
+        <span>© ${yr} Haazir · ${L_("Pilot for Lahore", "لاہور پائلٹ")}</span>
+        <span>${L_("Availability numbers are sample data in this pilot; doctor names are fictional.", "اس پائلٹ میں دستیابی کے نمبر نمونہ ہیں؛ ڈاکٹروں کے نام فرضی ہیں۔")}</span>
+        <span>${L_("Not medical advice. Haazir does not diagnose. In an emergency call", "طبی مشورہ نہیں۔ ایمرجنسی میں کال کریں")} <a href="tel:1122">1122</a>.</span>
+        <span>${L_("Map data", "نقشہ")} © OpenStreetMap contributors</span>
+      </div>`;
   }
 
   // ------------------------------------------------------------ shared blocks
@@ -217,7 +241,7 @@
     $app.innerHTML = `
     <div class="hero2">
       <section class="hero">
-        <div class="badge"><span class="pulse"></span> ${L_("Live in Lahore · built on AWS", "لاہور میں لائیو · AWS پر")}</div>
+        <div class="badge"><span class="pulse"></span> ${L_("Live in Lahore", "لاہور میں لائیو")}</div>
         <h1 class="big1">${L_("Know <em>before</em> you go.", "جانے <em>سے پہلے</em> جانیں۔")}</h1>
         <p>${L_("Free bed? Doctor on duty? CT working? Your medicine? O-negative blood? One question in Urdu or English, answered across Lahore's hospitals, pharmacies and blood banks.", "خالی بستر؟ ڈیوٹی ڈاکٹر؟ سی ٹی چالو؟ دوا؟ او نیگیٹو خون؟ اردو یا انگریزی میں ایک سوال، پورے لاہور سے جواب۔")}</p>
         <form class="ask" id="askForm"><input id="q" autocomplete="off" maxlength="300" placeholder="${L_("What do you need? e.g. abbu ko seenay mein dard", "آپ کو کیا چاہیے؟")}" aria-label="What do you need"><button type="button" class="mic" id="mic" title="Speak" aria-label="Speak">🎤</button><button class="go">${L_("Find", "تلاش")}</button></form>
@@ -230,21 +254,22 @@
         <a class="btn sm" href="#/dashboard" style="margin-top:10px">🗺️ ${L_("Open city dashboard", "شہر ڈیش بورڈ کھولیں")} →</a>
       </aside>
     </div>
+    <div class="scene">${(window.HAAZIR_ART || {}).scene || ""}</div>
     <div class="emstrip"><div class="grow">🚨 ${L_("Emergency? Don't wait. Call now.", "ایمرجنسی؟ انتظار نہ کریں، ابھی کال کریں۔")}</div>
       <a href="tel:1122">📞 Rescue 1122</a><a href="tel:115" class="ghost">📞 Edhi 115</a><a href="#/ask?q=${encodeURIComponent("emergency")}" class="ghost">${L_("Nearest emergency →", "قریب ترین ایمرجنسی →")}</a></div>
     <div class="tiles2">${tiles.map(([h, i, c, t, s]) => `<a class="tile2" href="${h}"><span class="ic ${c}">${i}</span><b>${t}</b><span class="s">${s}</span></a>`).join("")}</div>
     <div class="bigstats" id="bigStats">${'<div class="stat skel" style="height:96px"></div>'.repeat(5)}</div>
+    <div class="sec"><h2>${L_("Everything you need, in one place", "سب کچھ ایک جگہ")}</h2><p class="lead">${L_("Real hospitals, pharmacies and blood banks across Lahore, plus the ambulance helplines.", "لاہور کے اصل ہسپتال، فارمیسیاں، بلڈ بینک اور ایمبولینس ہیلپ لائنز۔")}</p>
+      <div class="showcase">${[["#/hospitals", "hospital", L_("19 hospitals", "19 ہسپتال"), L_("10 government (free) · 9 private", "10 سرکاری · 9 پرائیویٹ")], ["#/medicine", "pharmacy", L_("71 pharmacies", "71 فارمیسیاں"), L_("Stock, uses, prescription info", "اسٹاک، استعمال، نسخہ")], ["#/blood", "bloodbank", L_("6 blood banks", "6 بلڈ بینک"), L_("Units by blood group", "بلڈ گروپ کے مطابق")], ["#/ambulance", "ambulance", L_("Ambulance", "ایمبولینس"), "Rescue 1122 · Edhi 115"]].map(([h, a, t, s]) => `<a class="showcard" href="${h}"><div class="art">${(window.HAAZIR_ART || {})[a] || ""}</div><b>${t}</b><span>${s}</span></a>`).join("")}</div></div>
     <div class="sec"><h2>${L_("Every facility on one map", "ہر ادارہ ایک نقشے پر")}</h2><p class="lead">${L_("Real hospitals, pharmacies and blood banks, coloured by reported capacity.", "اصل ہسپتال، فارمیسیاں اور بلڈ بینک، رپورٹ شدہ گنجائش کے رنگ میں۔")}</p>
       <div class="legend"><span><span class="dot" style="background:#138a4a"></span> ${L_("beds free", "بستر خالی")}</span><span><span class="dot" style="background:#b26a00"></span> ${L_("few beds", "کم بستر")}</span><span><span class="dot" style="background:#c62828"></span> ${L_("full", "بھرا")}</span><span><span class="dot" style="background:#8a96a0"></span> ${L_("not reported", "رپورٹ نہیں")}</span><span><span class="dot" style="background:#7b5cd6"></span> ${L_("blood bank", "بلڈ بینک")}</span><span><span class="dot" style="background:#1e66f5"></span> ${L_("pharmacy", "فارمیسی")}</span></div>
       <div class="map" id="homeMap"></div></div>
     <div class="sec"><h2>${L_("How Haazir works", "حاضر کیسے کام کرتا ہے")}</h2><p class="lead">${L_("The information already exists in the heads of ward staff, pharmacists and blood bank clerks. Haazir connects it to families.", "معلومات اسٹاف کے پاس موجود ہے؛ حاضر اسے خاندانوں تک پہنچاتا ہے۔")}</p>
       <div class="flow">
-        <div class="card"><span class="num">1</span><h3>${L_("Staff send one line", "اسٹاف ایک لائن بھیجے")}</h3><div class="small muted">${L_("In Roman Urdu, the way they'd text on WhatsApp. AI on Amazon Bedrock turns it into updates they confirm.", "رومن اردو میں، جیسے واٹس ایپ پر۔ AI اسے اپ ڈیٹس میں بدلتا ہے۔")}</div><div class="eg">Medicine ward mein 2 bed khali, CT kharab hai</div></div>
-        <div class="card"><span class="num">2</span><h3>${L_("Families ask", "خاندان پوچھیں")}</h3><div class="small muted">${L_("Typed or spoken, Urdu or English. Danger signs show 1122 and Edhi first.", "لکھ کر یا بول کر۔ خطرے کی علامت پر پہلے 1122۔")}</div><div class="eg">abbu ko seenay mein dard</div></div>
-        <div class="card"><span class="num">3</span><h3>${L_("Go to the right place", "صحیح جگہ جائیں")}</h3><div class="small muted">${L_("Ranked hospitals with a 'why', directions, and an alert so the ER knows you're coming.", "درجہ بندی، راستہ، اور ہسپتال کو پیشگی اطلاع۔")}</div><div class="eg">★ PIC · 4 Cardiology beds · 7 min</div></div>
+        <div class="card"><span class="num">1</span><div class="art sm">${(window.HAAZIR_ART || {}).phone || ""}</div><h3>${L_("Staff send one line", "اسٹاف ایک لائن بھیجے")}</h3><div class="small muted">${L_("In Roman Urdu, the way they'd text on WhatsApp. AI on Amazon Bedrock turns it into updates they confirm.", "رومن اردو میں، جیسے واٹس ایپ پر۔ AI اسے اپ ڈیٹس میں بدلتا ہے۔")}</div><div class="eg">Medicine ward mein 2 bed khali, CT kharab hai</div></div>
+        <div class="card"><span class="num">2</span><div class="art sm">${(window.HAAZIR_ART || {}).search || ""}</div><h3>${L_("Families ask", "خاندان پوچھیں")}</h3><div class="small muted">${L_("Typed or spoken, Urdu or English. Danger signs show 1122 and Edhi first.", "لکھ کر یا بول کر۔ خطرے کی علامت پر پہلے 1122۔")}</div><div class="eg">abbu ko seenay mein dard</div></div>
+        <div class="card"><span class="num">3</span><div class="art sm">${(window.HAAZIR_ART || {}).pin || ""}</div><h3>${L_("Go to the right place", "صحیح جگہ جائیں")}</h3><div class="small muted">${L_("Ranked hospitals with a 'why', directions, and an alert so the ER knows you're coming.", "درجہ بندی، راستہ، اور ہسپتال کو پیشگی اطلاع۔")}</div><div class="eg">★ PIC · 4 Cardiology beds · 7 min</div></div>
       </div></div>
-    <div class="sec"><h2>${L_("Built on AWS", "AWS پر بنا")}</h2><p class="lead">${L_("Serverless, pay-per-use, ready to scale from one hospital to all of Punjab.", "سرور لیس، ایک ہسپتال سے پورے پنجاب تک۔")}</p>
-      <div class="awsrow"><span>Amazon Bedrock</span><span>AWS Lambda</span><span>Amazon DynamoDB</span><span>Amazon API Gateway</span><span>Amazon CloudFront</span><span>Amazon S3</span><span>AWS CloudFormation</span></div></div>
     <div class="sec"><h2>${L_("Why you can trust it", "اس پر بھروسہ کیوں")}</h2>
     <div class="card small">
       📍 ${L_("Real places: 19 Lahore hospitals (10 government, 9 private), pharmacies from OpenStreetMap, and known blood banks.", "اصل مقامات: 19 ہسپتال، اوپن اسٹریٹ میپ کی فارمیسیاں، معروف بلڈ بینک۔")}<br>
@@ -750,6 +775,36 @@
     every(load, 15000);
   }
 
+  // ---- contact / join the pilot
+  function contactPage(params) {
+    const roles = [["family", L_("Patient or family", "مریض یا خاندان")], ["hospital", L_("Hospital staff", "ہسپتال اسٹاف")], ["pharmacy", L_("Pharmacy", "فارمیسی")], ["bloodbank", L_("Blood bank", "بلڈ بینک")], ["health_department", L_("Health department", "محکمہ صحت")], ["other", L_("Other", "دیگر")]];
+    const pre = params.get("role") || "family";
+    $app.innerHTML = `<div class="grid2" style="align-items:start">
+      <div><h1>✉️ ${L_("Contact us", "رابطہ کریں")}</h1>
+        <p class="muted">${L_("Questions, feedback, or want your hospital, pharmacy or blood bank to join the Haazir pilot? Send us a message and we'll get back to you.", "سوال، رائے، یا اپنا ہسپتال، فارمیسی یا بلڈ بینک شامل کرنا چاہتے ہیں؟ پیغام بھیجیں۔")}</p>
+        <div class="card"><div class="field"><input id="cName" maxlength="80" placeholder="${L_("Your name", "آپ کا نام")}"></div>
+          <div class="field"><select id="cRole">${roles.map(([v, l]) => `<option value="${v}" ${v === pre ? "selected" : ""}>${l}</option>`).join("")}</select><input id="cOrg" maxlength="120" placeholder="${L_("Organisation (optional)", "ادارہ (اختیاری)")}"></div>
+          <div class="field"><input id="cReach" maxlength="120" placeholder="${L_("Phone or email", "فون یا ای میل")}"></div>
+          <textarea id="cMsg" maxlength="1000" placeholder="${L_("Your message", "آپ کا پیغام")}"></textarea>
+          <p class="small muted">🔒 ${L_("We only use your details to reply to you. Never share medical details here; in an emergency call 1122.", "آپ کی معلومات صرف جواب دینے کے لیے استعمال ہوں گی۔ ایمرجنسی میں 1122 کال کریں۔")}</p>
+          <div class="btns"><button class="btn p" id="cSend">➤ ${L_("Send message", "پیغام بھیجیں")}</button></div><div id="cOut"></div></div></div>
+      <div><div class="card art">${(window.HAAZIR_ART || {}).hospital || ""}</div>
+        <div class="card small"><h3>${L_("Emergency numbers", "ایمرجنسی نمبر")}</h3>
+          <div class="btns">${helplineBtns(false)}</div><p class="muted">${L_("Haazir is not an emergency service. For any emergency call Rescue 1122 or Edhi 115 first.", "حاضر ایمرجنسی سروس نہیں۔ پہلے 1122 یا 115 کال کریں۔")}</p></div>
+        <div class="card small"><h3>🏥 ${L_("For hospitals, pharmacies and blood banks", "ہسپتالوں، فارمیسیوں اور بلڈ بینکوں کے لیے")}</h3>
+          <p class="muted">${L_("Joining is free. Your staff report availability in one Roman-Urdu message from any phone, and families see it instantly.", "شمولیت مفت ہے۔ اسٹاف کسی بھی فون سے ایک پیغام میں رپورٹ کرتا ہے۔")}</p><a class="btn sm" href="#/staff">${L_("Try the staff portal", "اسٹاف پورٹل آزمائیں")} →</a></div></div></div>`;
+    document.getElementById("cSend").onclick = async (ev) => {
+      const out = document.getElementById("cOut");
+      ev.target.disabled = true;
+      try {
+        const r = await post("/contact", { name: document.getElementById("cName").value, role: document.getElementById("cRole").value, organisation: document.getElementById("cOrg").value, contact: document.getElementById("cReach").value, message: document.getElementById("cMsg").value });
+        out.innerHTML = `<div class="note">✅ ${L_("Thank you! Your message has been received. Reference:", "شکریہ! آپ کا پیغام موصول ہو گیا۔ ریفرنس:")} <b>${esc(r.referenceCode)}</b></div>`;
+        ["cName", "cOrg", "cReach", "cMsg"].forEach((id) => { document.getElementById(id).value = ""; });
+      } catch (e) { out.innerHTML = errBox(e); }
+      ev.target.disabled = false;
+    };
+  }
+
   // ------------------------------------------------------------ router
   function route() {
     cleanup();
@@ -772,6 +827,7 @@
       case "equipment": return equipmentPage(params);
       case "staff": return staffPage();
       case "dashboard": return dashboardPage();
+      case "contact": return contactPage(params);
       default: return home();
     }
   }

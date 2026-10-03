@@ -209,6 +209,25 @@ def r_notify(event):
     return {"referenceCode": aid, "facility": f["name"], "department": dept}
 
 
+CONTACT_ROLES = {"family", "hospital", "pharmacy", "bloodbank", "health_department", "other"}
+
+
+def r_contact(event):
+    """Contact / join-the-pilot form. Stored in DynamoDB; only used to reply."""
+    data = body_of(event)
+    name = text_arg(data.get("name"), 80)
+    reach = text_arg(data.get("contact"), 120)
+    message = text_arg(data.get("message"), 1000)
+    role = data.get("role") if data.get("role") in CONTACT_ROLES else "other"
+    if not name or not reach or len(message) < 5:
+        raise BadRequest("Please add your name, a phone number or email, and a short message")
+    cid = "C" + uuid.uuid4().hex[:6].upper()
+    db.put({"pk": f"CONTACT#{cid}", "sk": "META", "id": cid, "name": name, "contact": reach, "role": role,
+            "organisation": text_arg(data.get("organisation"), 120), "message": message, "createdAt": logic.now()})
+    db.bump(contactMessages=1)
+    return {"referenceCode": cid}
+
+
 def r_medicine_search(event):
     q = qs(event)
     lat, lon = logic.loc(q.get("lat"), q.get("lon"))
@@ -460,6 +479,7 @@ ROUTES = [
     ("GET", r"^/facility/([\w-]+)$", r_facility),
     ("GET", r"^/helplines$", lambda e: {"helplines": HELPLINES}),
     ("POST", r"^/notify$", r_notify),
+    ("POST", r"^/contact$", r_contact),
     ("GET", r"^/medicine/search$", r_medicine_search),
     ("POST", r"^/medicine/plan$", r_medicine_plan),
     ("POST", r"^/medicine/prescription$", r_prescription),
@@ -482,6 +502,7 @@ STATIC_DIR = os.path.join(os.path.dirname(__file__), "static")
 STATIC = {"/": ("index.html", "text/html; charset=utf-8"), "/index.html": ("index.html", "text/html; charset=utf-8"),
           "/app.js": ("app.js", "application/javascript; charset=utf-8"),
           "/styles.css": ("styles.css", "text/css; charset=utf-8"),
+          "/art.js": ("art.js", "application/javascript; charset=utf-8"),
           "/config.js": (None, "application/javascript")}
 
 
@@ -501,7 +522,8 @@ def reset_to_real_data():
     """Remove every non-reference row (reports, requests, alerts) and reseed real facilities + flagged demo rows."""
     items = build_items() + build_demo_items()
     keep = {(i["pk"], i["sk"]) for i in items}
-    stale = [(i["pk"], i["sk"]) for i in db._scan_all() if (i["pk"], i["sk"]) not in keep]
+    stale = [(i["pk"], i["sk"]) for i in db._scan_all()
+             if (i["pk"], i["sk"]) not in keep and not i["pk"].startswith("CONTACT#")]  # never delete messages
     db.batch_delete(stale)
     db.batch_write(items + [{"pk": "STATS", "sk": "GLOBAL", "searches": 0, "medicineSearches": 0, "bloodRequests": 0,
                              "estMinutesSaved": 0, "notifications": 0, "staffUpdates": 0}])

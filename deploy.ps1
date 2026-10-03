@@ -12,7 +12,7 @@ $Artifacts = "haazir-artifacts-$Account"
 # bundle the static site into the Lambda package
 Remove-Item -Recurse -Force backend\static -ErrorAction SilentlyContinue
 New-Item -ItemType Directory backend\static | Out-Null
-Copy-Item frontend\index.html, frontend\app.js, frontend\styles.css backend\static\
+Copy-Item frontend\index.html, frontend\app.js, frontend\art.js, frontend\styles.css backend\static\
 if (Test-Path frontend\og.png) { Copy-Item frontend\og.png backend\static\ }
 Get-ChildItem -Recurse -Directory -Filter __pycache__ backend | Remove-Item -Recurse -Force
 
