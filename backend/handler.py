@@ -540,6 +540,13 @@ def api(event, context=None):
         return resp(204, {})
     if method == "GET" and path in STATIC:
         return static_file(path)
+    mm = re.match(r"^/media/([\w-]+\.png)$", path)
+    if method == "GET" and mm:
+        fp = os.path.join(STATIC_DIR, "media", mm.group(1))
+        if os.path.exists(fp):
+            with open(fp, "rb") as fh:
+                return {"statusCode": 200, "isBase64Encoded": True, "body": base64.b64encode(fh.read()).decode(),
+                        "headers": {"content-type": "image/png", "cache-control": "public, max-age=3600"}}
     for m, pat, fn in ROUTES:
         mt = re.match(pat, path)
         if m == method and mt:

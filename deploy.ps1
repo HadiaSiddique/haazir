@@ -14,6 +14,7 @@ Remove-Item -Recurse -Force backend\static -ErrorAction SilentlyContinue
 New-Item -ItemType Directory backend\static | Out-Null
 Copy-Item frontend\index.html, frontend\app.js, frontend\art.js, frontend\styles.css backend\static\
 if (Test-Path frontend\og.png) { Copy-Item frontend\og.png backend\static\ }
+if (Test-Path frontend\media) { Copy-Item -Recurse frontend\media backend\static\media }
 Get-ChildItem -Recurse -Directory -Filter __pycache__ backend | Remove-Item -Recurse -Force
 
 aws s3api head-bucket --bucket $Artifacts --region $Region 2>&1 | Out-Null
