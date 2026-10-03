@@ -199,7 +199,7 @@ def build_demo_items():
                 items.append(row(f"FACILITY#{pid}", "medicine", key, qty=q))
     for bid, *_ in BLOOD_BANKS:
         for g in BLOOD_GROUPS:
-            lo, hi = (0, 3) if g.endswith("-") else (2, 15)
+            lo, hi = (0, 5) if g.endswith("-") else (3, 18)
             items.append(row(f"FACILITY#{bid}", "blood", g, units=rnd.randint(lo, hi)))
     return items
 

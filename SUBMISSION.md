@@ -82,7 +82,7 @@ flowchart LR
 
 ## What's real, and the honest limitations
 - **Real:** 19 hospitals (names, locations checked against OpenStreetMap/Wikipedia, main departments), 71 pharmacies (OpenStreetMap), 6 blood banks (public listings; 4 locations are neighbourhood-level and marked "approximate location"), medicine brand → ingredient mapping, ABO/Rh table, helpline numbers.
-- **Demo data:** bed counts, doctors on duty (fictional names), machine status, pharmacy stock and blood units are sample data for the demo, tagged "sample". Opening the site with `?demo=0` (https://d1zq9eagbu3k0c.cloudfront.net/?demo=0) shows only real staff reports, where everything else reads "not reported yet".
+- **Demo data:** bed counts, doctors on duty (fictional names), machine status, pharmacy stock and blood units are sample data for the demo, tagged "sample". Real staff reports replace the sample value for that item.
 - **Privacy:** only public business information (facility names and map locations) is used. No patient data, no real doctor names, and no phone numbers of individuals. A blood-request contact number is optional and only goes into the user's own WhatsApp message.
 - **Reported, not real-time integrated:** availability comes only from staff using the portal. In this pilot the staff PIN is shared (1234) so judges can try it, which means anyone could post a report. A real rollout needs verified staff accounts (Amazon Cognito) and partner hospitals, pharmacies and blood banks.
 - **Not connected** to any hospital IT system or to Rescue 1122 / Edhi dispatch. Phone numbers for facilities are not shown because I couldn't verify them.

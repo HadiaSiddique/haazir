@@ -18,7 +18,7 @@
   const HELPLINES = [["1122", "Rescue 1122", "ریسکیو 1122"], ["115", "Edhi Ambulance", "ایدھی ایمبولینس"]];
 
   function store(k, v) { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (e) { return null; } }
-  const state = { lang: store("lang") || "en", loc: null, staff: null, demo: !/[?&]demo=0\b/.test(location.search) };
+  const state = { lang: store("lang") || "en", loc: null, staff: null, demo: true }; // sample data always shown (tagged "sample"); real staff reports replace it
   try { const l = JSON.parse(store("loc") || "null"); if (l && l.lat) state.loc = l; } catch (e) {}
   if (!state.loc) state.loc = { lat: 31.5204, lon: 74.3487, label: "Gulberg" };
 
