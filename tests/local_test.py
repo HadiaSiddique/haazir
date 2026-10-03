@@ -10,7 +10,9 @@ import handler  # noqa: E402
 FAIL = []
 
 
-def call(method, path, body=None, q=None, expect=200):
+def call(method, path, body=None, q=None, expect=200, demo="0"):
+    q = dict(q or {})
+    q.setdefault("demo", demo)
     ev = {"requestContext": {"http": {"method": method}}, "rawPath": path, "queryStringParameters": q,
           "body": json.dumps(body) if body is not None else None}
     r = handler.api(ev)
@@ -34,7 +36,7 @@ fakes.STORE[("FACILITY#hosp-mayo", "RES#bed#ICU")] = {"pk": "FACILITY#hosp-mayo"
 fakes.STORE[("AMBULANCE#amb-01", "META")] = {"pk": "AMBULANCE#amb-01", "sk": "META", "id": "amb-01"}
 print(handler.api({"action": "seed"}))
 check(("AMBULANCE#amb-01", "META") not in fakes.STORE, "simulated ambulance removed")
-check(("FACILITY#hosp-mayo", "RES#bed#ICU") not in fakes.STORE, "simulated bed row removed")
+check(fakes.STORE.get(("FACILITY#hosp-mayo", "RES#bed#ICU"), {}).get("demo"), "old row replaced by flagged demo row")
 
 L = {"lat": 31.5204, "lon": 74.3487}
 st = call("GET", "/stats")
@@ -105,4 +107,13 @@ call("GET", "/facilities")
 call("GET", "/helplines")
 call("POST", "/ask", {"text": ""}, expect=400)
 call("GET", "/nope", expect=404)
+dm = call("POST", "/ask", {"text": "abbu ko seenay mein dard", **L}, demo="1")
+check(any(h["demo"] and h["freeBeds"] is not None for h in dm["hospitals"]), "demo mode: sample numbers shown and tagged demo")
+check(any("demo sample" in h["why"] for h in dm["hospitals"]), "demo rows say demo in the why line")
+mm = call("GET", "/medicine/search", q={"q": "panadol", **L})
+check(mm["matched"][0]["use"] == "Pain relief and fever" and mm["matched"][0]["rx"] == "otc", "medicine use + prescription status")
+ma = call("GET", "/medicine/search", q={"q": "augmentin", **L})
+check(ma["matched"][0]["rx"] == "rx", "antibiotic marked prescription needed")
+sd = call("GET", "/stats", demo="1")
+check(len(sd["recentReports"]) > 0, "activity feed has entries")
 print("\nFAILURES:", FAIL if FAIL else "none")

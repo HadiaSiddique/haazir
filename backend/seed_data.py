@@ -112,11 +112,96 @@ MEDICINES = [
     ("ceftriaxone-1g", "Ceftriaxone 1g injection (generic)", "Ceftriaxone", "1g"),
 ]
 
+# General, patient-friendly information per active ingredient (not medical advice).
+# rx: "rx" = prescription needed, "otc" = usually sold without prescription, "ask" = ask your pharmacist
+MED_INFO = {
+    "Paracetamol": ("Pain relief and fever", "درد اور بخار کے لیے", "otc"),
+    "Amoxicillin + Clavulanic acid": ("Antibiotic for bacterial infections (chest, ear, throat, urine, skin)", "بیکٹیریا والے انفیکشن کے لیے اینٹی بائیوٹک", "rx"),
+    "Ibuprofen": ("Pain, swelling and fever", "درد، سوجن اور بخار کے لیے", "otc"),
+    "Metronidazole": ("Certain bacterial and parasitic infections, e.g. stomach and gut infections", "معدے اور آنتوں کے بعض انفیکشن کے لیے", "rx"),
+    "Omeprazole": ("Acidity, heartburn and stomach ulcers", "تیزابیت، سینے کی جلن اور معدے کے السر کے لیے", "ask"),
+    "Esomeprazole": ("Acidity, heartburn and stomach ulcers", "تیزابیت، سینے کی جلن اور معدے کے السر کے لیے", "ask"),
+    "Metformin": ("Type 2 diabetes (lowers blood sugar)", "شوگر (ٹائپ 2) کنٹرول کرنے کے لیے", "rx"),
+    "Aspirin": ("300mg: pain and fever. 75mg: low dose to help prevent heart attack and stroke, only if a doctor advises", "300 ملی گرام: درد اور بخار۔ 75 ملی گرام: ڈاکٹر کے مشورے سے دل کے دورے سے بچاؤ", "ask"),
+    "Atorvastatin": ("Lowers cholesterol", "کولیسٹرول کم کرنے کے لیے", "rx"),
+    "Amlodipine": ("High blood pressure and angina (heart-related chest pain)", "ہائی بلڈ پریشر اور دل کے درد کے لیے", "rx"),
+    "Bisoprolol": ("High blood pressure and some heart conditions", "ہائی بلڈ پریشر اور دل کی بعض بیماریوں کے لیے", "rx"),
+    "Clopidogrel": ("Prevents blood clots after a heart attack, stent or stroke", "دل کے دورے، اسٹنٹ یا فالج کے بعد خون جمنے سے بچاؤ", "rx"),
+    "Glyceryl trinitrate": ("Fast relief of angina (heart-related chest pain), under the tongue", "دل کے درد میں فوری آرام (زبان کے نیچے)", "rx"),
+    "Salbutamol": ("Quick relief of asthma and wheezing", "دمہ اور سانس کی گھٹن میں فوری آرام", "rx"),
+    "Mefenamic acid": ("Pain, including period pain", "درد، بشمول ماہواری کا درد", "ask"),
+    "Ciprofloxacin": ("Antibiotic for bacterial infections, e.g. urine infections and typhoid", "پیشاب کے انفیکشن اور ٹائیفائیڈ وغیرہ کے لیے اینٹی بائیوٹک", "rx"),
+    "Cetirizine": ("Allergies: sneezing, runny nose, itching, hives", "الرجی: چھینکیں، ناک بہنا، خارش", "otc"),
+    "Oral rehydration salts": ("Replaces water and salts lost in diarrhoea or vomiting", "دست یا الٹی میں پانی اور نمکیات کی کمی پوری کرنے کے لیے", "otc"),
+    "Human insulin 30/70": ("Diabetes: controls blood sugar (injection)", "شوگر کنٹرول کرنے کے لیے انسولین (انجکشن)", "rx"),
+    "Furosemide": ("Removes extra fluid (swelling, heart failure) and lowers blood pressure", "جسم سے اضافی پانی نکالنے اور بلڈ پریشر کے لیے", "rx"),
+    "Ceftriaxone": ("Injection antibiotic for serious infections, given by a doctor or nurse", "شدید انفیکشن کے لیے اینٹی بائیوٹک انجکشن (ڈاکٹر/نرس لگائیں)", "rx"),
+}
+
 # Real emergency ambulance helplines (no simulated vehicles)
 HELPLINES = [
     {"name": "Rescue 1122 (Punjab Emergency Service)", "number": "1122"},
     {"name": "Edhi Ambulance", "number": "115"},
 ]
+
+
+DEPT_SIZE = {"Emergency": 30, "Medicine": 50, "Surgery": 40, "Cardiology": 30, "Paediatrics": 35,
+             "Gynae/Obstetrics": 40, "Orthopaedics": 30, "ICU": 14, "Burns": 12}
+_FIRST_F = ["Sana", "Ayesha", "Fatima", "Hira", "Mehwish", "Saba", "Amna", "Rabia", "Zara", "Maryam", "Nida", "Iqra"]
+_FIRST_M = ["Ahmed", "Usman", "Bilal", "Faisal", "Hamza", "Imran", "Kamran", "Saad", "Zain", "Ali", "Omer", "Waqas"]
+_LAST = ["Khan", "Siddiqui", "Raza", "Tariq", "Hussain", "Iqbal", "Sheikh", "Butt", "Javed", "Malik", "Qureshi", "Aslam"]
+
+
+def build_demo_items():
+    """Clearly-flagged DEMO availability (demo=True) so the pilot can be explored before real staff report.
+    Rows carry demoAgeMin instead of a fixed time; the API shows them as 'demo' and lets users switch them off.
+    A real staff report on the same item overwrites the demo row."""
+    import random
+    rnd = random.Random(7)
+    items = []
+    used = set()
+
+    def name(female):
+        for _ in range(50):
+            n = f"Dr {rnd.choice(_FIRST_F if female else _FIRST_M)} {rnd.choice(_LAST)}"
+            if n not in used:
+                used.add(n)
+                return n
+        return n
+
+    def row(pk, kind, key, **kw):
+        return {"pk": pk, "sk": f"RES#{kind}#{key}", "kind": kind, "key": key, "demo": True,
+                "demoAgeMin": rnd.randint(2, 75), "updatedBy": "demo sample", **kw}
+
+    for hid, _n, _u, _la, _lo, depts, ownership in HOSPITALS:
+        pk = f"FACILITY#hosp-{hid}"
+        private = ownership == "private"
+        for d in depts:
+            size = max(4, int(DEPT_SIZE[d] * (0.4 if private else 1)))
+            free = rnd.choice([0, 0, 1, 2, 3, 4, 6, 8] if not private else [0, 1, 2, 3, 4, 5])
+            items.append(row(pk, "bed", d, free=min(free, size)))
+            for j in range(2 if d in ("Emergency", "Medicine") else 1):
+                female = d == "Gynae/Obstetrics" or hid.startswith("lady") or rnd.random() < 0.35
+                if hid == "mayo" and d == "Medicine" and j == 0:
+                    n, female = "Dr Sana Khan", True
+                else:
+                    n = name(female)
+                key = n.lower().replace("dr ", "").replace(" ", "-")
+                items.append(row(pk, "doctor", key, name=n, dept=d, gender="F" if female else "M",
+                                 onDuty=rnd.random() < 0.75, shiftEnds=rnd.choice(["14:00", "20:00", "22:00", "08:00"])))
+        for e in (EQUIPMENT if len(depts) > 4 else ["XRay", "Oxygen", "Ventilator"]):
+            status = "working" if e == "Oxygen" else rnd.choices(["working", "busy", "down"], [0.75, 0.13, 0.12])[0]
+            items.append(row(pk, "equipment", e, status=status))
+    for pid, _n, _la, _lo in PHARMACIES[::2]:  # about half the pharmacies
+        for key, mname, salt, strength in MEDICINES:
+            if rnd.random() < 0.55:
+                q = rnd.choice([0, 3, 6, 10, 15, 20, 30])
+                items.append(row(f"FACILITY#{pid}", "medicine", key, qty=q))
+    for bid, *_ in BLOOD_BANKS:
+        for g in BLOOD_GROUPS:
+            lo, hi = (0, 3) if g.endswith("-") else (2, 15)
+            items.append(row(f"FACILITY#{bid}", "blood", g, units=rnd.randint(lo, hi)))
+    return items
 
 
 def build_items(now=None):

@@ -7,7 +7,7 @@ import re
 import time
 
 import ai
-from seed_data import MEDICINES, BLOOD_GROUPS
+from seed_data import BLOOD_GROUPS, MED_INFO, MEDICINES
 
 LAHORE = (31.5204, 74.3587)
 TRAFFIC_KMH = 20
@@ -220,6 +220,7 @@ def hospital_card(f, lat, lon, dept=None):
         "equipment": {k: {"status": v["status"], "stale": not fresh(v), "updatedAt": v.get("updatedAt")}
                       for k, v in f["equipment"].items()},
         "hasReports": bool(reports), "updatedAt": max(reports) if reports else None,
+        "demo": any(r.get("demo") for g in ("beds", "doctors", "equipment") for r in f[g].values()),
     }
 
 
@@ -239,18 +240,21 @@ def rank_hospitals(snap, lat, lon, dept=None, equipment=None, female=False, seha
         if dept:
             why.append(f"has {dept}")
             fb = card["freeBeds"]
+            src = "demo sample:" if f["beds"].get(dept, {}).get("demo") else "staff report"
             if fb is None:
                 why.append("beds not reported yet")
             elif fb == 0:
                 score -= 100
-                why.append(f"staff report no free {dept} beds")
+                why.append(f"{src} no free {dept} beds")
             else:
                 score += 30 + min(fb, 5) * 3
-                why.append(f"staff report {fb} free {dept} beds")
-            specialists = [d for d in f["doctors"].values() if d.get("onDuty") and d.get("dept") == dept]
+                why.append(f"{src} {fb} free {dept} beds")
+            # real reports first, then demo sample rows
+            specialists = sorted((d for d in f["doctors"].values() if d.get("onDuty") and d.get("dept") == dept),
+                                 key=lambda d: bool(d.get("demo")))
             if specialists:
                 score += 25
-                why.append(f"{specialists[0]['name']} reported on duty")
+                why.append(f"{specialists[0]['name']} {'(demo) ' if specialists[0].get('demo') else ''}on duty")
         if female:
             fem = [d for d in f["doctors"].values() if d.get("onDuty") and d.get("gender") == "F"
                    and (not dept or d.get("dept") == dept)]
@@ -291,7 +295,9 @@ def minutes_saved(results):
 
 # ---------------------------------------------------------------- medicine
 
-CATALOG = {k: {"key": k, "name": n, "salt": s, "strength": st} for k, n, s, st in MEDICINES}
+CATALOG = {k: {"key": k, "name": n, "salt": s, "strength": st,
+               "use": MED_INFO.get(s, (None, None, "ask"))[0], "useUr": MED_INFO.get(s, (None, None, "ask"))[1],
+               "rx": MED_INFO.get(s, (None, None, "ask"))[2]} for k, n, s, st in MEDICINES}
 
 
 def match_medicine(q):
@@ -344,7 +350,8 @@ def medicine_search(snap, q, lat, lon):
             r = f["medicine"].get(k)
             if r and r.get("qty", 0) > 0:
                 stock.append({"key": k, "name": CATALOG[k]["name"], "qty": r["qty"], "priceRs": r.get("priceRs"),
-                              "exact": k == primary, "stale": not fresh(r), "updatedAt": r.get("updatedAt")})
+                              "exact": k == primary, "stale": not fresh(r), "updatedAt": r.get("updatedAt"),
+                              "demo": bool(r.get("demo"))})
         if not stock:
             continue
         km = haversine(lat, lon, f["lat"], f["lon"])
@@ -429,6 +436,7 @@ def blood_search(snap, group, units, lat, lon):
                       "locationPrecision": f.get("locationPrecision", "exact"),
                       "distanceKm": round(km, 1), "etaMin": eta_min(km), "reported": reported,
                       "exactUnits": exact, "compatibleUnits": comp, "enough": exact is not None and exact >= units,
+                      "demo": any(r.get("demo") for r in f["blood"].values()),
                       "updatedAt": updated, "stale": bool(updated) and now() - updated > STALE_SECONDS})
     banks.sort(key=lambda b: (not b["enough"], not b["reported"], b["distanceKm"]))
     return {"group": group, "units": units, "compatibleGroups": compat, "banks": banks,
@@ -448,7 +456,7 @@ def equipment_search(snap, etype, lat, lon):
         rows.append({"id": f["id"], "name": f["name"], "lat": f["lat"], "lon": f["lon"],
                      "ownership": f.get("ownership", "government"), "distanceKm": round(km, 1), "etaMin": eta_min(km),
                      "status": e["status"] if e else "unknown", "updatedAt": e.get("updatedAt") if e else None,
-                     "stale": bool(e) and not fresh(e)})
+                     "stale": bool(e) and not fresh(e), "demo": bool(e and e.get("demo"))})
     order = {"working": 0, "busy": 1, "unknown": 2, "down": 3}
     rows.sort(key=lambda r: (order[r["status"]], r["etaMin"]))
     return {"type": etype, "results": rows}

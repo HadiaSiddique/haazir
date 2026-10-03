@@ -57,6 +57,8 @@ def snapshot(force=False):
             if sk == "META":
                 f.update({k: v for k, v in it.items() if k not in ("pk", "sk")})
             else:
+                if it.get("demo"):  # demo rows always look recent: age is relative to now
+                    it["updatedAt"] = int(time.time()) - int(it.get("demoAgeMin", 10)) * 60
                 kind = it.get("kind")
                 bucket = {"bed": "beds", "doctor": "doctors", "equipment": "equipment",
                           "medicine": "medicine", "blood": "blood"}.get(kind)
@@ -70,6 +72,19 @@ def snapshot(force=False):
             "ambulances": ambulances, "stats": stats}
     _cache.update(at=time.time(), data=data)
     return data
+
+
+def view(snap, demo=True):
+    """The snapshot as seen by a user: with demo rows (default) or real staff reports only."""
+    if demo:
+        return snap
+    facs = {}
+    for fid, f in snap["facilities"].items():
+        g = dict(f)
+        for b in ("beds", "doctors", "equipment", "medicine", "blood"):
+            g[b] = {k: v for k, v in f[b].items() if not v.get("demo")}
+        facs[fid] = g
+    return {**snap, "facilities": facs}
 
 
 def invalidate():

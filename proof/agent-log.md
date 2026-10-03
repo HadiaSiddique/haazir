@@ -26,3 +26,4 @@ Every important AWS command run by the coding agent (Claude Code) during the bui
 | 06:00 | OSM Overpass (amenity=pharmacy) + web search for blood banks | 71 real pharmacies and 6 real blood banks replace fictional ones |
 | 06:20 | Rebuilt data model + `deploy.ps1 -Seed` | Availability now only from staff reports; 1,143 simulated rows deleted from DynamoDB; simulator Lambda + EventBridge schedule removed |
 | 06:30 | Live checks | 19 hospitals / 71 pharmacies / 6 blood banks; 0 invented beds or machines; demo story test passes |
+| 07:10 | `deploy.ps1 -Seed` | Demo mode: 1,236 sample rows flagged demo (switchable, real reports override); medicine uses + prescription status; redesigned home with live feed |

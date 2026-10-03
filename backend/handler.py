@@ -11,7 +11,7 @@ import uuid
 import ai
 import db
 import logic
-from seed_data import HELPLINES, build_items
+from seed_data import HELPLINES, build_demo_items, build_items
 
 STAFF_PIN = os.environ.get("STAFF_PIN", "1234")
 GROUP_RE = re.compile(r"^(A|B|AB|O)[+-]$")
@@ -59,6 +59,12 @@ def require_staff(data, snap):
     return f
 
 
+def snap_for(event, data=None):
+    """Snapshot as the user sees it: demo sample data ON by default; demo=0 shows real staff reports only."""
+    v = (data or {}).get("demo", qs(event).get("demo", "1"))
+    return db.view(db.snapshot(), str(v).lower() not in ("0", "false"))
+
+
 # ------------------------------------------------------------------ routes
 
 def r_ask(event):
@@ -71,7 +77,7 @@ def r_ask(event):
     area = (ent.get("area") or "").lower().strip()
     if area in logic.AREAS:
         lat, lon = logic.AREAS[area]
-    snap = db.snapshot()
+    snap = snap_for(event, data)
     out = {"intent": intent, "entities": ent, "understoodBy": source, "lat": lat, "lon": lon,
            "reasonEn": ent.get("reasonEn"), "reasonUr": ent.get("reasonUr"), "helplines": HELPLINES}
     counters = {"searches": 1}
@@ -115,14 +121,14 @@ def r_hospitals(event):
     dept = q.get("dept") if q.get("dept") in logic.DEPARTMENTS else None
     eq = q.get("equipment") if q.get("equipment") in logic.EQUIP_TYPES else None
     own = q.get("type") if q.get("type") in ("government", "private") else None
-    return {"hospitals": logic.rank_hospitals(db.snapshot(), lat, lon, dept=dept, equipment=eq,
+    return {"hospitals": logic.rank_hospitals(snap_for(event), lat, lon, dept=dept, equipment=eq,
                                               female=q.get("female") == "1", ownership=own)}
 
 
 def r_facility(event, fid):
     q = qs(event)
     lat, lon = logic.loc(q.get("lat"), q.get("lon"))
-    snap = db.snapshot()
+    snap = snap_for(event)
     f = snap["facilities"].get(fid)
     if not f:
         return resp(404, {"error": "Facility not found"})
@@ -143,8 +149,10 @@ def r_facility(event, fid):
     for g in ("beds", "doctors", "equipment", "medicine", "blood"):
         for r in f[g].values():
             label = r.get("name") or logic.CATALOG.get(r.get("key"), {}).get("name") or r.get("key")
-            updates.append({"what": f"{r.get('kind')}: {label}", "by": r.get("updatedBy"), "at": r.get("updatedAt")})
+            updates.append({"what": f"{r.get('kind')}: {label}", "by": r.get("updatedBy"), "at": r.get("updatedAt"),
+                            "demo": bool(r.get("demo"))})
     card["recentUpdates"] = sorted(updates, key=lambda u: -(u["at"] or 0))[:8]
+    card["demo"] = any(r.get("demo") for g in ("beds", "doctors", "equipment", "medicine", "blood") for r in f[g].values())
     return card
 
 
@@ -191,7 +199,7 @@ def r_medicine_search(event):
     if not name:
         raise BadRequest("Type a medicine name")
     db.bump(medicineSearches=1, searches=1)
-    return logic.medicine_search(db.snapshot(), name, lat, lon)
+    return logic.medicine_search(snap_for(event), name, lat, lon)
 
 
 def r_medicine_plan(event):
@@ -200,7 +208,7 @@ def r_medicine_plan(event):
     names = [text_arg(n, 80) for n in (data.get("items") or []) if text_arg(n, 80)]
     if not names:
         raise BadRequest("Add at least one medicine")
-    return logic.medicine_plan(db.snapshot(), names, lat, lon)
+    return logic.medicine_plan(snap_for(event, data), names, lat, lon)
 
 
 def r_prescription(event):
@@ -237,7 +245,7 @@ def r_blood_search(event):
         units = int(q.get("units") or 1)
     except ValueError:
         units = 1
-    return logic.blood_search(db.snapshot(), g, units, lat, lon)
+    return logic.blood_search(snap_for(event), g, units, lat, lon)
 
 
 def r_blood_request(event):
@@ -265,7 +273,7 @@ def r_blood_request(event):
 def r_equipment(event):
     q = qs(event)
     lat, lon = logic.loc(q.get("lat"), q.get("lon"))
-    return logic.equipment_search(db.snapshot(), q.get("type"), lat, lon)
+    return logic.equipment_search(snap_for(event), q.get("type"), lat, lon)
 
 
 def apply_changes(f, changes, who="staff portal (pilot)"):
@@ -368,7 +376,7 @@ def r_login(event):
 
 
 def r_stats(event):
-    snap = db.snapshot()
+    snap = snap_for(event)
     facs = list(snap["facilities"].values())
     hosp = [f for f in facs if f["type"] == "hospital"]
     reporting = [f for f in hosp if f["beds"] or f["doctors"] or f["equipment"]]
@@ -396,11 +404,26 @@ def r_stats(event):
         "reportedFreeBeds": sum(free_by_dept.values()), "reportedFreeBedsByDept": free_by_dept,
         "hospitalsReportedFull": full, "machinesReportedDown": down, "reportedBloodUnits": blood,
         "counters": snap.get("stats", {}), "updatedAt": logic.now(),
+        "recentReports": recent_reports(snap),
     }
 
 
+def recent_reports(snap, n=8):
+    """Latest bed/equipment/blood/stock reports across the city, for the live activity feed."""
+    rows = []
+    for f in snap["facilities"].values():
+        for b, r in f["beds"].items():
+            rows.append((r.get("updatedAt", 0), f["name"], f"{b}: {r.get('free')} free beds", "bed", r.get("demo"), f["id"]))
+        for e, r in f["equipment"].items():
+            rows.append((r.get("updatedAt", 0), f["name"], f"{e}: {r.get('status')}", "equipment", r.get("demo"), f["id"]))
+        for g, r in f["blood"].items():
+            rows.append((r.get("updatedAt", 0), f["name"], f"{g}: {r.get('units')} units", "blood", r.get("demo"), f["id"]))
+    rows.sort(key=lambda x: -x[0])
+    return [{"at": a, "facility": fn, "text": t, "kind": k, "demo": bool(d), "id": i} for a, fn, t, k, d, i in rows[:n]]
+
+
 def r_map(event):
-    snap = db.snapshot()
+    snap = snap_for(event)
     pts = []
     for f in snap["facilities"].values():
         p = {"id": f["id"], "name": f["name"], "type": f["type"], "lat": f["lat"], "lon": f["lon"]}
@@ -458,8 +481,8 @@ def static_file(path):
 
 
 def reset_to_real_data():
-    """Remove every non-reference row (old simulated availability, ambulances, requests, alerts) and reseed."""
-    items = build_items()
+    """Remove every non-reference row (reports, requests, alerts) and reseed real facilities + flagged demo rows."""
+    items = build_items() + build_demo_items()
     keep = {(i["pk"], i["sk"]) for i in items}
     stale = [(i["pk"], i["sk"]) for i in db._scan_all() if (i["pk"], i["sk"]) not in keep]
     db.batch_delete(stale)
