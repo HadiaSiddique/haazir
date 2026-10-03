@@ -3,3 +3,4 @@ __pycache__/
 .seed-out.json
 *.pyc
 backend/static/
+.claude/
