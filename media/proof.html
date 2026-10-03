@@ -1,0 +1,51 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Agent connection proof</title><style>
+body { margin: 0; background: #0c1116; font-family: Consolas, 'Cascadia Mono', monospace; color: #d6e2ea; }
+.bar { background: #1c252e; padding: 10px 16px; font-family: Segoe UI, sans-serif; font-size: 14px; color: #9fb2c0; display: flex; gap: 8px; align-items: center; }
+.dot { width: 12px; height: 12px; border-radius: 50%; display: inline-block; }
+.cap { margin-left: 12px; } pre { margin: 0; padding: 18px 22px; font-size: 15px; line-height: 1.45; white-space: pre; }
+.p { color: #5fd3a5; } .c { color: #ffd479; font-weight: 700; }
+.foot { padding: 10px 22px 18px; font-family: Segoe UI, sans-serif; font-size: 13px; color: #8aa1b0; }
+</style></head><body>
+<div class="bar"><span class="dot" style="background:#ff5f57"></span><span class="dot" style="background:#febc2e"></span><span class="dot" style="background:#28c840"></span><span class="cap">Claude Code (coding agent) connected to AWS via AWS CLI &middot; region us-east-1 &middot; account ID masked</span></div>
+<pre><span class="p">PS C:\haazir&gt; </span><span class="c">aws sts get-caller-identity</span>
+{
+    &quot;UserId&quot;: &quot;0158****6165&quot;,
+    &quot;Account&quot;: &quot;0158****6165&quot;,
+    &quot;Arn&quot;: &quot;arn:aws:iam::0158****6165:root&quot;
+}
+
+<span class="p">PS C:\haazir&gt; </span><span class="c">aws cloudformation describe-stacks --stack-name haazir --query &quot;Stacks[0].[StackName,StackStatus,LastUpdatedTime]&quot; --output table</span>
+--------------------------------------
+|           DescribeStacks           |
++------------------------------------+
+|  haazir                            |
+|  UPDATE_COMPLETE                   |
+|  2026-10-03T00:37:21.688000+00:00  |
++------------------------------------+
+
+<span class="p">PS C:\haazir&gt; </span><span class="c">aws lambda list-functions --query &quot;Functions[?starts_with(FunctionName, &#39;haazir&#39;)].[FunctionName,Runtime,Architectures[0]]&quot; --output table</span>
+---------------------------------------
+|            ListFunctions            |
++-------------+--------------+--------+
+|  haazir-api |  python3.12  |  arm64 |
++-------------+--------------+--------+
+
+<span class="p">PS C:\haazir&gt; </span><span class="c">aws dynamodb describe-table --table-name HaazirData --query &quot;Table.[TableName,TableStatus,BillingModeSummary.BillingMode]&quot; --output table</span>
+---------------------
+|   DescribeTable   |
++-------------------+
+|  HaazirData       |
+|  ACTIVE           |
+|  PAY_PER_REQUEST  |
++-------------------+
+
+<span class="p">PS C:\haazir&gt; </span><span class="c">aws cloudfront list-distributions --query &quot;DistributionList.Items[].[DomainName,Status]&quot; --output table</span>
+-----------------------------------------------
+|              ListDistributions              |
++--------------------------------+------------+
+|  d1zq9eagbu3k0c.cloudfront.net |  Deployed  |
++--------------------------------+------------+
+
+</pre>
+<div class="foot">Commands run by the coding agent during the Zero to Shipped build of Haazir. Full command log: proof/agent-log.md</div>
+</body></html>

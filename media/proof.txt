@@ -1,0 +1,39 @@
+﻿PS C:\haazir> aws sts get-caller-identity
+{
+    "UserId": "0158****6165",
+    "Account": "0158****6165",
+    "Arn": "arn:aws:iam::0158****6165:root"
+}
+
+PS C:\haazir> aws cloudformation describe-stacks --stack-name haazir --query "Stacks[0].[StackName,StackStatus,LastUpdatedTime]" --output table
+--------------------------------------
+|           DescribeStacks           |
++------------------------------------+
+|  haazir                            |
+|  UPDATE_COMPLETE                   |
+|  2026-10-03T00:37:21.688000+00:00  |
++------------------------------------+
+
+PS C:\haazir> aws lambda list-functions --query "Functions[?starts_with(FunctionName, 'haazir')].[FunctionName,Runtime,Architectures[0]]" --output table
+---------------------------------------
+|            ListFunctions            |
++-------------+--------------+--------+
+|  haazir-api |  python3.12  |  arm64 |
++-------------+--------------+--------+
+
+PS C:\haazir> aws dynamodb describe-table --table-name HaazirData --query "Table.[TableName,TableStatus,BillingModeSummary.BillingMode]" --output table
+---------------------
+|   DescribeTable   |
++-------------------+
+|  HaazirData       |
+|  ACTIVE           |
+|  PAY_PER_REQUEST  |
++-------------------+
+
+PS C:\haazir> aws cloudfront list-distributions --query "DistributionList.Items[].[DomainName,Status]" --output table
+-----------------------------------------------
+|              ListDistributions              |
++--------------------------------+------------+
+|  d1zq9eagbu3k0c.cloudfront.net |  Deployed  |
++--------------------------------+------------+
+
