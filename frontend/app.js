@@ -632,39 +632,66 @@
       }
     }
     async function renderQuick() {
-      let ex = s.type === "pharmacy" ? "Panadol khatam, Augmentin 20 packs aa gaye" : s.type === "bloodbank" ? "O- 2 unit, B+ 10 unit" : "Medicine ward mein 2 bed khali, CT kharab hai, Dr Sana 8 baje tak duty pe";
-      if (s.type === "hospital") {
+      // Chat-style flow: type (or tap suggestions) -> Send update -> check what was understood -> Publish -> done
+      let f = null;
+      try { f = await api(`/facility/${s.facilityId}`); } catch (e) {}
+      const depts = (f && f.departments) || ["Medicine"];
+      const d0 = (depts.find((d) => d !== "Emergency") || "Emergency").split("/")[0];
+      const chips = s.type === "pharmacy"
+        ? ["Panadol khatam", "Augmentin 20 packs aa gaye", "Risek 10 packs aa gaye", "Brufen khatam"]
+        : s.type === "bloodbank"
+          ? ["O- 2 unit", "O+ 12 unit", "B+ 10 unit", "AB- 1 unit"]
+          : [`${d0} ward mein 2 bed khali`, "Emergency mein 3 bed khali", `${d0} ward full`, "CT kharab hai", "CT theek ho gaya", "Dr Sana 8 baje tak duty pe"];
+      body.innerHTML = `<div class="card">
+        <h3>⚡ ${L_("What's the situation right now?", "اس وقت کیا صورتحال ہے؟")}</h3>
+        <p class="small muted">${L_("Type one message the way you'd send it on WhatsApp, or tap the suggestions to build it. Only report what is true right now.", "واٹس ایپ کی طرح ایک پیغام لکھیں یا نیچے سے منتخب کریں۔ صرف وہی لکھیں جو اس وقت درست ہو۔")}</p>
+        <div class="small" style="margin:6px 0 4px"><b>${L_("Tap to add:", "شامل کرنے کے لیے دبائیں:")}</b></div>
+        <div class="chips" id="qChips">${chips.map((c) => `<button type="button" class="chip" data-chip="${esc(c)}">+ ${esc(c)}</button>`).join("")}</div>
+        <textarea id="qText" maxlength="500" placeholder="${esc(chips.slice(0, 3).join(", "))}"></textarea>
+        <div class="btns"><button class="btn p" id="qSend" style="min-width:180px">➤ ${L_("Send update", "اپ ڈیٹ بھیجیں")}</button><button class="btn" id="qClear">${L_("Clear", "صاف کریں")}</button></div>
+        <div id="qOut"></div></div>
+        <div class="card"><h3>🕒 ${L_("Your recent updates", "آپ کی حالیہ اپ ڈیٹس")}</h3><div id="qHist" class="small muted">…</div></div>`;
+      const ta = document.getElementById("qText"), out = document.getElementById("qOut");
+      body.querySelectorAll("[data-chip]").forEach((b) => b.onclick = () => { ta.value = (ta.value.trim() ? ta.value.trim().replace(/[,.]$/, "") + ", " : "") + b.dataset.chip; ta.focus(); });
+      document.getElementById("qClear").onclick = () => { ta.value = ""; out.innerHTML = ""; };
+      async function history() {
+        const h = document.getElementById("qHist");
         try {
-          const f = await api(`/facility/${s.facilityId}`);
-          const d0 = (f.departments || []).find((d) => d !== "Emergency") || "Emergency";
-          ex = `${d0.split("/")[0]} ward mein 2 bed khali, CT kharab hai, Dr Sana 8 baje tak duty pe`;
-        } catch (e) {}
+          const ff = await api(`/facility/${s.facilityId}`);
+          const mine = (ff.recentUpdates || []).filter((u) => !u.demo);
+          h.innerHTML = mine.length ? mine.map((u) => `<div>✅ ${esc(u.what)} · <span class="muted">${ago(u.at)}</span></div>`).join("") : L_("No updates from staff yet. Your first update will appear here.", "ابھی کوئی اپ ڈیٹ نہیں۔");
+        } catch (e) { h.innerHTML = errBox(e); }
       }
-      body.innerHTML = `<div class="card"><h3>⚡ ${L_("Type one message, the way you'd send it on WhatsApp", "ایک پیغام لکھیں، جیسے واٹس ایپ پر")}</h3>
-        <p class="small muted">${L_("Only report what is true right now. Families will see it with your report time.", "صرف وہی رپورٹ کریں جو اس وقت درست ہو۔")}</p>
-        <textarea id="qText" maxlength="500" placeholder="${esc(ex)}"></textarea><div class="btns"><button class="btn sm" id="qEx">${L_("Show example", "مثال")}</button><button class="btn p" id="qParse">${L_("Preview changes", "تبدیلیاں دیکھیں")}</button></div><div id="qOut"></div></div>`;
-      document.getElementById("qEx").onclick = () => { document.getElementById("qText").value = ex; };
-      document.getElementById("qParse").onclick = async (ev) => {
-        const text = document.getElementById("qText").value.trim();
-        const out = document.getElementById("qOut");
-        if (!text) return;
-        ev.target.disabled = true; out.innerHTML = `<div class="note">🧠 ${L_("Understanding…", "سمجھ رہا ہے…")}</div>`;
+      document.getElementById("qSend").onclick = async (ev) => {
+        const text = ta.value.trim();
+        if (!text) { out.innerHTML = `<div class="note warn">${L_("Type a message or tap a suggestion first.", "پہلے پیغام لکھیں یا کوئی تجویز دبائیں۔")}</div>`; return; }
+        ev.target.disabled = true; out.innerHTML = `<div class="note">🧠 ${L_("Reading your message…", "پیغام پڑھا جا رہا ہے…")}</div>`;
         try {
           const r = await post("/staff/parse", { facilityId: s.facilityId, pin: s.pin, text });
-          if (!r.changes.length) { out.innerHTML = `<div class="note warn">${L_("No changes understood. Try naming the ward, machine, doctor or medicine.", "کوئی تبدیلی سمجھ نہیں آئی۔")}</div>`; }
-          else {
-            out.innerHTML = `<div class="note">${L_("Understood. Untick anything that's wrong:", "سمجھا گیا؛ غلط کو ہٹا دیں:")} <span class="pill o">${r.understoodBy === "ai" ? "AI" : L_("keywords", "الفاظ")}</span></div>` +
+          if (!r.changes.length) {
+            out.innerHTML = `<div class="note warn">${L_("Couldn't understand that. Mention the ward (e.g. Medicine ward), the machine (CT, MRI, XRay…), the doctor (Dr Name) or the medicine, or tap a suggestion above.", "سمجھ نہیں آیا۔ وارڈ، مشین، ڈاکٹر یا دوا کا نام لکھیں۔")}</div>`;
+          } else {
+            out.innerHTML = `<div class="note" style="margin-top:12px"><b>${L_("Haazir understood:", "حاضر نے یہ سمجھا:")}</b> <span class="small muted">${L_("untick anything that's wrong", "غلط کو ہٹا دیں")}</span></div>` +
               r.changes.map((c, i) => `<label class="ctl"><span class="grow">${esc(c.label)}</span><input type="checkbox" checked data-i="${i}" style="width:24px;height:24px"></label>`).join("") +
-              `<div class="btns"><button class="btn p" id="qApply">✅ ${L_("Confirm & publish", "تصدیق کریں")}</button></div>`;
-            document.getElementById("qApply").onclick = async () => {
+              `<div class="btns"><button class="btn p" id="qPub" style="min-width:180px">✅ ${L_("Publish now", "ابھی شائع کریں")}</button><button class="btn" id="qEdit">✏️ ${L_("Edit message", "پیغام بدلیں")}</button></div>`;
+            document.getElementById("qEdit").onclick = () => { out.innerHTML = ""; ta.focus(); };
+            document.getElementById("qPub").onclick = async (e2) => {
               const chosen = r.changes.filter((c, i) => out.querySelector(`[data-i="${i}"]`).checked);
-              try { const u = await post("/staff/update", { facilityId: s.facilityId, pin: s.pin, changes: chosen }); out.innerHTML = `<div class="note">✅ ${u.applied.length} ${L_("reports published. Families see them now.", "رپورٹس شائع ہو گئیں۔")}</div>`; }
-              catch (e) { out.innerHTML = errBox(e); }
+              if (!chosen.length) return;
+              e2.target.disabled = true;
+              try {
+                const u = await post("/staff/update", { facilityId: s.facilityId, pin: s.pin, changes: chosen });
+                out.innerHTML = `<div class="note" style="margin-top:12px">🎉 <b>${u.applied.length} ${L_("updates published.", "اپ ڈیٹس شائع ہو گئیں۔")}</b> ${L_("Families searching Haazir see them now.", "خاندان انہیں ابھی دیکھ سکتے ہیں۔")}</div>
+                  <div class="btns"><button class="btn p" id="qAgain">➕ ${L_("Send another update", "ایک اور اپ ڈیٹ")}</button><a class="btn" href="#/facility/${s.facilityId}">👀 ${L_("See what families see", "خاندان کیا دیکھتے ہیں")}</a></div>`;
+                document.getElementById("qAgain").onclick = () => { ta.value = ""; out.innerHTML = ""; ta.focus(); };
+                history();
+              } catch (e) { out.innerHTML = errBox(e); }
             };
           }
         } catch (e) { out.innerHTML = errBox(e); }
         ev.target.disabled = false;
       };
+      history();
     }
     async function renderAlerts() {
       async function load() {

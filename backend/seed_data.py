@@ -178,7 +178,7 @@ def build_demo_items():
         private = ownership == "private"
         for d in depts:
             size = max(4, int(DEPT_SIZE[d] * (0.4 if private else 1)))
-            free = rnd.choice([0, 0, 1, 2, 3, 4, 6, 8] if not private else [0, 1, 2, 3, 4, 5])
+            free = rnd.choice([2, 3, 4, 5, 6, 8, 10, 12] if not private else [2, 3, 4, 5, 6])  # sample data: never zero
             items.append(row(pk, "bed", d, free=min(free, size)))
             for j in range(2 if d in ("Emergency", "Medicine") else 1):
                 female = d == "Gynae/Obstetrics" or hid.startswith("lady") or rnd.random() < 0.35
@@ -188,18 +188,18 @@ def build_demo_items():
                     n = name(female)
                 key = n.lower().replace("dr ", "").replace(" ", "-")
                 items.append(row(pk, "doctor", key, name=n, dept=d, gender="F" if female else "M",
-                                 onDuty=rnd.random() < 0.75, shiftEnds=rnd.choice(["14:00", "20:00", "22:00", "08:00"])))
+                                 onDuty=j == 0 or rnd.random() < 0.75, shiftEnds=rnd.choice(["14:00", "20:00", "22:00", "08:00"])))
         for e in (EQUIPMENT if len(depts) > 4 else ["XRay", "Oxygen", "Ventilator"]):
-            status = "working" if e == "Oxygen" else rnd.choices(["working", "busy", "down"], [0.75, 0.13, 0.12])[0]
+            status = "working" if e == "Oxygen" else rnd.choices(["working", "busy"], [0.85, 0.15])[0]
             items.append(row(pk, "equipment", e, status=status))
     for pid, _n, _la, _lo in PHARMACIES[::2]:  # about half the pharmacies
         for key, mname, salt, strength in MEDICINES:
             if rnd.random() < 0.55:
-                q = rnd.choice([0, 3, 6, 10, 15, 20, 30])
+                q = rnd.choice([4, 6, 10, 15, 20, 30])
                 items.append(row(f"FACILITY#{pid}", "medicine", key, qty=q))
     for bid, *_ in BLOOD_BANKS:
         for g in BLOOD_GROUPS:
-            lo, hi = (0, 5) if g.endswith("-") else (3, 18)
+            lo, hi = (2, 6) if g.endswith("-") else (5, 20)
             items.append(row(f"FACILITY#{bid}", "blood", g, units=rnd.randint(lo, hi)))
     return items
 

@@ -148,12 +148,29 @@ def r_facility(event, fid):
     updates = []
     for g in ("beds", "doctors", "equipment", "medicine", "blood"):
         for r in f[g].values():
-            label = r.get("name") or logic.CATALOG.get(r.get("key"), {}).get("name") or r.get("key")
-            updates.append({"what": f"{r.get('kind')}: {label}", "by": r.get("updatedBy"), "at": r.get("updatedAt"),
+            updates.append({"what": describe(r), "by": r.get("updatedBy"), "at": r.get("updatedAt"),
                             "demo": bool(r.get("demo"))})
     card["recentUpdates"] = sorted(updates, key=lambda u: -(u["at"] or 0))[:8]
     card["demo"] = any(r.get("demo") for g in ("beds", "doctors", "equipment", "medicine", "blood") for r in f[g].values())
     return card
+
+
+def describe(r):
+    """Human-readable one-liner for a reported resource row."""
+    k = r.get("kind")
+    if k == "bed":
+        return f"{r['key']}: {r.get('free')} free beds"
+    if k == "doctor":
+        on = "on duty" + (f" until {r['shiftEnds']}" if r.get("shiftEnds") else "") if r.get("onDuty") else "off duty"
+        return f"{r.get('name')}{' (' + r['dept'] + ')' if r.get('dept') else ''}: {on}"
+    if k == "equipment":
+        return f"{r['key']}: {r.get('status')}"
+    if k == "medicine":
+        name = logic.CATALOG.get(r.get("key"), {}).get("name", r.get("key"))
+        return f"{name}: {r.get('qty')} in stock" if r.get("qty") else f"{name}: out of stock"
+    if k == "blood":
+        return f"Blood {r['key']}: {r.get('units')} units"
+    return str(r.get("key"))
 
 
 def r_facilities(event):
