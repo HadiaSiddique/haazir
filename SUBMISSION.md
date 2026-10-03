@@ -5,7 +5,7 @@
 **Tags:** #social-good #community
 **Try it:** type *"abbu ko seenay mein dard"* on the home page · Staff portal pilot PIN: **1234**
 
-> **Real places, clearly-labelled demo numbers.** Every hospital, pharmacy and blood bank in Haazir is a real place in Lahore. Because no hospital reports to Haazir yet, the live site starts in **Demo mode**: availability numbers are sample data, tagged **🧪 demo sample** on every card. Switch **Demo data** off in the header to see only real staff reports. Any real staff report immediately replaces the demo value for that item.
+> **Note on data:** this is a working pilot with **demo data**. The hospitals, pharmacies and blood banks are real, publicly listed places in Lahore, but the availability numbers you see (free beds, doctors on duty, machine status, medicine stock, blood units) are **sample data** for the demo, marked with a small "sample" tag. Doctor names are fictional, and no personal data is used. When a staff member reports through the staff portal, the real report replaces the sample value immediately.
 
 ---
 
@@ -82,7 +82,8 @@ flowchart LR
 
 ## What's real, and the honest limitations
 - **Real:** 19 hospitals (names, locations checked against OpenStreetMap/Wikipedia, main departments), 71 pharmacies (OpenStreetMap), 6 blood banks (public listings; 4 locations are neighbourhood-level and marked "approximate location"), medicine brand → ingredient mapping, ABO/Rh table, helpline numbers.
-- **Demo sample data:** bed counts, doctors on duty (fictional names), machine status, pharmacy stock and blood units shown in Demo mode are sample data for demonstration, each tagged 'demo sample'. With Demo data switched off, only real staff reports are shown and everything else reads 'not reported yet'.
+- **Demo data:** bed counts, doctors on duty (fictional names), machine status, pharmacy stock and blood units are sample data for the demo, tagged "sample". Opening the site with `?demo=0` (https://d1zq9eagbu3k0c.cloudfront.net/?demo=0) shows only real staff reports, where everything else reads "not reported yet".
+- **Privacy:** only public business information (facility names and map locations) is used. No patient data, no real doctor names, and no phone numbers of individuals. A blood-request contact number is optional and only goes into the user's own WhatsApp message.
 - **Reported, not real-time integrated:** availability comes only from staff using the portal. In this pilot the staff PIN is shared (1234) so judges can try it, which means anyone could post a report. A real rollout needs verified staff accounts (Amazon Cognito) and partner hospitals, pharmacies and blood banks.
 - **Not connected** to any hospital IT system or to Rescue 1122 / Edhi dispatch. Phone numbers for facilities are not shown because I couldn't verify them.
 - My AWS account was brand new and still being verified during the hackathon, so Bedrock returned "account being verified" / daily-quota errors for part of the build. The keyword fallback kept every feature working. [Update this line if Bedrock started working before you submitted.]

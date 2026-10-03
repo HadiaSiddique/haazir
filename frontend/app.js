@@ -18,7 +18,7 @@
   const HELPLINES = [["1122", "Rescue 1122", "ریسکیو 1122"], ["115", "Edhi Ambulance", "ایدھی ایمبولینس"]];
 
   function store(k, v) { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (e) { return null; } }
-  const state = { lang: store("lang") || "en", loc: null, staff: null, demo: store("demo") !== "0" };
+  const state = { lang: store("lang") || "en", loc: null, staff: null, demo: !/[?&]demo=0\b/.test(location.search) };
   try { const l = JSON.parse(store("loc") || "null"); if (l && l.lat) state.loc = l; } catch (e) {}
   if (!state.loc) state.loc = { lat: 31.5204, lon: 74.3487, label: "Gulberg" };
 
@@ -78,6 +78,7 @@
   function chrome() {
     document.documentElement.lang = state.lang === "ur" ? "ur" : "en";
     document.documentElement.dir = state.lang === "ur" ? "rtl" : "ltr";
+    document.getElementById("pilot").style.display = state.demo ? "none" : "";
     document.getElementById("pilot").textContent = state.demo
       ? L_("🧪 Demo mode: hospitals, pharmacies and blood banks are real places in Lahore; the availability numbers are SAMPLE data for this demo. Switch 'Demo data' off to see real staff reports only.", "🧪 ڈیمو: ہسپتال، فارمیسیاں اور بلڈ بینک اصل ہیں؛ دستیابی کے نمبر نمونہ (فرضی) ہیں۔ صرف اصل رپورٹس دیکھنے کے لیے ڈیمو بند کریں۔")
       : L_("Real reports only: availability shown here was reported by staff. Anything not reported says 'not reported yet'.", "صرف اصل رپورٹس: دستیابی اسٹاف نے رپورٹ کی ہے۔");
@@ -87,11 +88,9 @@
       link("#/hospitals", "Hospitals", "ہسپتال", "hide-m") + link("#/medicine", "Medicine", "دوا", "hide-m") +
       link("#/blood", "Blood", "خون", "hide-m") + link("#/dashboard", "Dashboard", "ڈیش بورڈ", "hide-m") +
       link("#/staff", "Staff", "اسٹاف") +
-      `<button class="demoSwitch ${state.demo ? "on" : ""}" id="demoBtn" title="Sample data for the demo">🧪 ${L_("Demo data", "ڈیمو")} <span class="k"></span></button>` +
       `<button class="lang" id="langBtn">${state.lang === "ur" ? "English" : "اردو"}</button>`;
-    document.getElementById("demoBtn").onclick = () => { state.demo = !state.demo; store("demo", state.demo ? "1" : "0"); route(); };
     document.getElementById("langBtn").onclick = () => { state.lang = state.lang === "ur" ? "en" : "ur"; store("lang", state.lang); route(); };
-    document.getElementById("foot").innerHTML = `<b>Haazir حاضر</b> · ${L_("Pilot for Lahore. Hospital, pharmacy and blood bank names and locations are real (OpenStreetMap, Wikipedia, public listings). " + (state.demo ? "Demo mode is on: availability numbers are sample data." : "Availability is shown only when staff report it.") + " Not connected to any hospital system or to Rescue 1122. In an emergency call", "لاہور کے لیے پائلٹ۔ دستیابی صرف اسٹاف کی رپورٹ پر۔ ایمرجنسی میں کال کریں")} <a href="tel:1122">1122</a>. ${L_("Haazir routes you to care. It does not diagnose.", "حاضر تشخیص نہیں کرتا، صرف راستہ دکھاتا ہے۔")} · Map data © OpenStreetMap contributors · Built on AWS.`;
+    document.getElementById("foot").innerHTML = `<b>Haazir حاضر</b> · ${L_("Pilot for Lahore. Hospital, pharmacy and blood bank names and locations are real (OpenStreetMap, Wikipedia, public listings). " + (state.demo ? "Pilot: availability numbers (beds, doctors, machines, stock, blood) are sample data; doctor names are fictional." : "Showing real staff reports only.") + " Not connected to any hospital system or to Rescue 1122. In an emergency call", "لاہور کے لیے پائلٹ۔ دستیابی صرف اسٹاف کی رپورٹ پر۔ ایمرجنسی میں کال کریں")} <a href="tel:1122">1122</a>. ${L_("Haazir routes you to care. It does not diagnose.", "حاضر تشخیص نہیں کرتا، صرف راستہ دکھاتا ہے۔")} · Map data © OpenStreetMap contributors · Built on AWS.`;
   }
 
   // ------------------------------------------------------------ shared blocks
@@ -138,7 +137,7 @@
   };
   const ownPill = (o) => (o === "private" ? `<span class="pill a">💳 ${L_("Private · fees apply", "پرائیویٹ · فیس")}</span>` : `<span class="pill o">🏛️ ${L_("Government · free", "سرکاری · مفت")}</span>`);
   const loadPill = (l) => (l === "Unknown" ? "" : `<span class="pill ${l === "Low" ? "g" : l === "Busy" ? "a" : "r"}">ER ${l === "Low" ? L_("has space", "جگہ ہے") : l === "Busy" ? L_("busy", "مصروف") : L_("reported full", "بھرا ہوا")}</span>`);
-  const demoPill = () => `<span class="pill demo">🧪 ${L_("demo sample", "ڈیمو نمونہ")}</span>`;
+  const demoPill = () => `<span class="pill sample" title="${L_("Sample data for this pilot", "پائلٹ کے لیے نمونہ ڈیٹا")}">${L_("sample", "نمونہ")}</span>`;
   const reportLine = (ts, by, demo) => (demo ? `${demoPill()}<span class="pill x">${ago(ts)}</span>` : ts ? `<span class="pill g">✓ ${L_("reported", "رپورٹ")} ${ago(ts)}${by ? " · " + esc(by) : ""}</span>${staleNote(ts)}` : `<span class="pill x">${L_("No live report yet", "ابھی کوئی رپورٹ نہیں")}</span>`);
 
   function hospitalCard(h, i) {
@@ -226,7 +225,7 @@
         ${locationRow(false)}
       </section>
       <aside class="live">
-        <h3><span class="pulse"></span> ${L_("Latest reports across Lahore", "لاہور بھر سے تازہ رپورٹس")} ${state.demo ? `<span class="pill demo">🧪 ${L_("demo sample", "ڈیمو")}</span>` : ""}</h3>
+        <h3><span class="pulse"></span> ${L_("Latest reports across Lahore", "لاہور بھر سے تازہ رپورٹس")} ${state.demo ? demoPill() : ""}</h3>
         <ul class="feed" id="feed">${'<li><div class="skel" style="height:34px;width:100%;margin:0"></div></li>'.repeat(5)}</ul>
         <a class="btn sm" href="#/dashboard" style="margin-top:10px">🗺️ ${L_("Open city dashboard", "شہر ڈیش بورڈ کھولیں")} →</a>
       </aside>
@@ -249,7 +248,7 @@
     <div class="sec"><h2>${L_("Why you can trust it", "اس پر بھروسہ کیوں")}</h2>
     <div class="card small">
       📍 ${L_("Real places: 19 Lahore hospitals (10 government, 9 private), pharmacies from OpenStreetMap, and known blood banks.", "اصل مقامات: 19 ہسپتال، اوپن اسٹریٹ میپ کی فارمیسیاں، معروف بلڈ بینک۔")}<br>
-      🧪 ${L_("Demo mode shows sample availability, clearly tagged 'demo sample'. Switch it off in the header to see real staff reports only.", "ڈیمو موڈ میں نمونہ ڈیٹا 'ڈیمو' لیبل کے ساتھ ہے؛ اوپر سے بند کریں۔")}<br>
+      🧪 ${L_("This pilot shows sample availability numbers (tagged 'sample') until hospitals start reporting. Real staff reports replace them instantly.", "یہ پائلٹ نمونہ نمبر دکھاتا ہے (نمونہ لیبل)، اسٹاف کی اصل رپورٹ فوراً ان کی جگہ لیتی ہے۔")}<br>
       🕒 ${L_("Every report shows when it was made; older than 2 hours is greyed out.", "ہر رپورٹ کا وقت درج ہے۔")}<br>
       🧮 ${L_("AI only understands language. A simple, explainable formula ranks hospitals.", "AI صرف زبان سمجھتا ہے؛ درجہ بندی سادہ فارمولا کرتا ہے۔")}<br>
       🚨 ${L_("Danger signs always show Rescue 1122 and Edhi 115 first. Haazir never diagnoses.", "خطرے کی علامات پر ہمیشہ پہلے 1122 اور 115۔")}

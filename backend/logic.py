@@ -240,7 +240,7 @@ def rank_hospitals(snap, lat, lon, dept=None, equipment=None, female=False, seha
         if dept:
             why.append(f"has {dept}")
             fb = card["freeBeds"]
-            src = "demo sample:" if f["beds"].get(dept, {}).get("demo") else "staff report"
+            src = "sample data:" if f["beds"].get(dept, {}).get("demo") else "staff report"
             if fb is None:
                 why.append("beds not reported yet")
             elif fb == 0:
@@ -254,7 +254,7 @@ def rank_hospitals(snap, lat, lon, dept=None, equipment=None, female=False, seha
                                  key=lambda d: bool(d.get("demo")))
             if specialists:
                 score += 25
-                why.append(f"{specialists[0]['name']} {'(demo) ' if specialists[0].get('demo') else ''}on duty")
+                why.append(f"{specialists[0]['name']} {'(sample) ' if specialists[0].get('demo') else ''}on duty")
         if female:
             fem = [d for d in f["doctors"].values() if d.get("onDuty") and d.get("gender") == "F"
                    and (not dept or d.get("dept") == dept)]

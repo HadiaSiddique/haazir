@@ -190,6 +190,7 @@ footer { border-top: 1px solid var(--line); padding: 20px 0 40px; color: var(--m
 .demoSwitch .k { width: 30px; height: 18px; border-radius: 999px; background: var(--line); position: relative; transition: background .15s; }
 .demoSwitch .k::after { content: ""; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 50%; background: #fff; transition: left .15s; }
 .demoSwitch.on .k { background: #b26a00; } .demoSwitch.on .k::after { left: 14px; }
+.pill.sample { background: transparent; color: var(--grey); border: 1px dashed var(--line); font-weight: 600; }
 .pill.demo { background: #fff3df; color: #8a5200; border: 1px dashed #e0a440; }
 .medinfo { display: grid; gap: 8px; margin-top: 10px; }
 .medinfo .use { background: var(--brand-l); border-radius: 10px; padding: 10px 12px; }
