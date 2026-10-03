@@ -5,7 +5,7 @@
 **Tags:** #social-good #community
 **Try it:** type *"abbu ko seenay mein dard"* on the home page · Staff portal pilot PIN: **1234**
 
-> **No invented data.** Every hospital, pharmacy and blood bank in Haazir is a real place in Lahore. Beds, doctors on duty, machine status, medicine stock and blood units appear **only** when staff report them. Until then Haazir says "not reported yet", never a made-up number.
+> **Real places, clearly-labelled demo numbers.** Every hospital, pharmacy and blood bank in Haazir is a real place in Lahore. Because no hospital reports to Haazir yet, the live site starts in **Demo mode**: availability numbers are sample data, tagged **🧪 demo sample** on every card. Switch **Demo data** off in the header to see only real staff reports. Any real staff report immediately replaces the demo value for that item.
 
 ---
 
@@ -36,7 +36,7 @@ So Haazir is built around **the reporting side first**: one Roman-Urdu message f
 | 🚨 | **Emergency first** | Danger signs (chest pain, breathing difficulty, unconscious, heavy bleeding, stroke signs, seizure, severe injury, labour complications) show the **real helplines first: Rescue 1122 and Edhi 115**, plus "Tell the hospital you're coming". Haazir routes you to a department. It never diagnoses. |
 | 🛏️ | **Hospitals** | **19 real Lahore hospitals: 10 government (free) and 9 private (fees apply)**, because in an emergency the nearest option matters. From Bahria Town, the nearest government hospital is ~50 min away but Bahria International is ~6 min. Ranked by reported free beds in the right department, specialist reported on duty, reported machine status and travel time, with a one-line **"why"**. If nothing is reported, they're ranked by department and distance, and Haazir says so. |
 | 🔔 | **Pre-arrival alerts** | Families (or anyone coming by 1122/Edhi) tap **"Tell hospital you're coming"**. The alert appears in that hospital's staff portal with ETA and a reference code; staff acknowledge it. |
-| 💊 | **Medicine** | Real brand → active-ingredient mapping, same-salt alternatives (with "confirm with your doctor or pharmacist"), stock at **real pharmacies from OpenStreetMap** once pharmacists report it. **Prescription photo scan**: AI reads the names, you confirm, and Haazir finds **one pharmacy that has reported having everything**, or the fewest stops. |
+| 💊 | **Medicine** | **What each medicine is used for** and whether it **needs a doctor's prescription**, real brand → active-ingredient mapping, same-salt alternatives (with "confirm with your doctor or pharmacist"), stock at **real pharmacies from OpenStreetMap** once pharmacists report it. **Prescription photo scan**: AI reads the names, you confirm, and Haazir finds **one pharmacy that has reported having everything**, or the fewest stops. |
 | 🩸 | **Blood** | **Real Lahore blood banks** (Sundas Foundation, Fatimid Foundation, Husaini, Red Crescent, LGH blood bank, Lahore Blood Bank at Aadil Hospital) with reported units per group, the standard ABO/Rh compatibility table, and a ready-to-forward **WhatsApp donor request** in English and Urdu. |
 | 🩻 | **Machines** | Where CT, MRI, X-ray, dialysis, ventilators and oxygen are reported working. |
 | 🗺️ | **City dashboard** | For the health department and emergency control rooms: map of real facilities coloured by reported capacity (grey = not reported), reporting coverage (e.g. "2/19 hospitals reporting"), ERs reported full, machines reported down, blood units. |
@@ -82,6 +82,7 @@ flowchart LR
 
 ## What's real, and the honest limitations
 - **Real:** 19 hospitals (names, locations checked against OpenStreetMap/Wikipedia, main departments), 71 pharmacies (OpenStreetMap), 6 blood banks (public listings; 4 locations are neighbourhood-level and marked "approximate location"), medicine brand → ingredient mapping, ABO/Rh table, helpline numbers.
+- **Demo sample data:** bed counts, doctors on duty (fictional names), machine status, pharmacy stock and blood units shown in Demo mode are sample data for demonstration, each tagged 'demo sample'. With Demo data switched off, only real staff reports are shown and everything else reads 'not reported yet'.
 - **Reported, not real-time integrated:** availability comes only from staff using the portal. In this pilot the staff PIN is shared (1234) so judges can try it, which means anyone could post a report. A real rollout needs verified staff accounts (Amazon Cognito) and partner hospitals, pharmacies and blood banks.
 - **Not connected** to any hospital IT system or to Rescue 1122 / Edhi dispatch. Phone numbers for facilities are not shown because I couldn't verify them.
 - My AWS account was brand new and still being verified during the hackathon, so Bedrock returned "account being verified" / daily-quota errors for part of the build. The keyword fallback kept every feature working. [Update this line if Bedrock started working before you submitted.]
